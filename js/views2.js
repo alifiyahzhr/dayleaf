@@ -255,6 +255,56 @@
     </div>`;
   }
 
+  /* ---------- cloud sync ---------- */
+  const pwField = (f, ph, autocomplete) => `<div class="pw-field"><input type="password" ${autocomplete ? `autocomplete="${autocomplete}"` : ''} data-f="${f}" placeholder="${ph}" aria-label="${ph}"><button type="button" class="icon-btn sm pw-eye" data-pw-toggle tabindex="-1" aria-label="Show password">${icon('eye')}</button></div>`;
+
+  function syncBlock() {
+    const sy = ui.sync, when = d => new Date(d).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+    const msg = `<p class="sec-msg${sy.msg ? ' show' : ''} ${sy.ok ? 'ok' : ''}" role="status">${esc(sy.msg || '')}</p>`;
+
+    if (!Sync.isSignedIn()) {
+      if (sy.mode === 'reset') {
+        return `<div class="backup">
+          <p class="muted">Enter your account email and we’ll send a link to reset your password.</p>
+          <div class="sec-form text" data-row-sync>
+            <input type="email" autocomplete="email" data-f="email" placeholder="Email" aria-label="Email">
+            <div class="sec-btns"><button class="btn primary sm" data-act="sync-reset-request">Send reset link</button><button class="btn ghost sm" data-act="sync-mode" data-v="signin">Back to sign in</button></div>
+          </div>${msg}</div>`;
+      }
+      return `<div class="backup">
+        <p class="muted">Sign in to sync your data to the cloud, so you can open the same dayleaf on another device.</p>
+        <div class="seg"><button class="${sy.mode === 'signin' ? 'on' : ''}" data-act="sync-mode" data-v="signin">Sign in</button><button class="${sy.mode === 'signup' ? 'on' : ''}" data-act="sync-mode" data-v="signup">Sign up</button></div>
+        <div class="sec-form text" data-row-sync>
+          <input type="email" autocomplete="email" data-f="email" placeholder="Email" aria-label="Email">
+          ${pwField('pw', 'Password', sy.mode === 'signup' ? 'new-password' : 'current-password')}
+          <div class="sec-btns"><button class="btn primary sm" data-act="sync-auth">${sy.mode === 'signup' ? 'Create account' : 'Sign in'}</button>${sy.mode === 'signin' ? `<button class="lk-link" data-act="sync-mode" data-v="reset">Forgot password?</button>` : ''}</div>
+        </div>${msg}</div>`;
+    }
+    if (Sync.needsPassphrase) {
+      return `<div class="backup">
+        <p class="muted">Signed in as <b>${esc(Sync.email())}</b>. Your cloud data is encrypted — enter the sync passphrase from your other device to unlock it here.</p>
+        <div class="sec-form text" data-row-sync>
+          ${pwField('pass', 'Sync passphrase')}
+          <div class="sec-btns"><button class="btn primary sm" data-act="sync-unlock">Unlock</button><button class="btn ghost sm" data-act="sync-signout">Sign out</button></div>
+        </div>${msg}</div>`;
+    }
+    if (!Sync.hasPassphrase() && !Sync.lastSyncedAt && !sy.encDecided) {
+      return `<div class="backup">
+        <p class="muted">Signed in as <b>${esc(Sync.email())}</b>. Add a sync passphrase to keep your data encrypted in the cloud — only you can read it, not even dayleaf's own code.</p>
+        <div class="sec-form text" data-row-sync>
+          ${pwField('pass', 'Sync passphrase')}
+          ${pwField('passConf', 'Confirm passphrase')}
+          <div class="sec-btns"><button class="btn primary sm" data-act="sync-enc-save">Enable encryption</button><button class="btn ghost sm" data-act="sync-enc-skip">Skip, sync without encryption</button></div>
+        </div>${msg}</div>`;
+    }
+    const p = sy.pullPreview, n = p && p.data;
+    return `<div class="backup">
+      <p class="last-backup">${icon('cloud')}Signed in as <b>${esc(Sync.email())}</b> · ${Sync.lastSyncedAt ? `Last synced ${when(Sync.lastSyncedAt)}` : 'Not synced yet'}${Sync.hasPassphrase() ? ' · encrypted' : ''}</p>
+      <div class="sec-actions"><button class="btn primary" data-act="sync-now">${icon('refresh')}Sync now</button><button class="btn ghost" data-act="sync-signout">Sign out</button></div>
+      ${p ? `<div class="restore-box"><b>Replace your current data with the version from the cloud?</b><small>Synced ${when(p.updatedAt)} · ${n.tasks.length} tasks, ${Object.keys(n.journal || {}).length} journal entries, ${n.habits.length} habits, ${n.projects.length} projects. Your current data on this device will be overwritten.</small><div class="sec-btns"><button class="btn primary sm" data-act="sync-pull-confirm">Replace my data</button><button class="btn ghost sm" data-act="sync-pull-cancel">Cancel</button></div></div>` : ''}
+      ${msg}</div>`;
+  }
+
   /* ---------- settings & security ---------- */
   V.modals.profile = () => {
     const sec = ui.sec, on = Security.enabled(), enc = Security.encrypted(), m = Security.meta() || {};
@@ -284,8 +334,26 @@
       <h3 class="m-h">${icon('download')}Backup</h3>
       ${backupBlock()}
 
+      <h3 class="m-h">${icon('cloud')}Sync across devices</h3>
+      ${syncBlock()}
+
       <h3 class="m-h">Data</h3>
       <div class="m-foot"><button class="btn ghost" data-act="reset-demo">${icon('refresh')}Reload sample data</button><button class="btn ghost danger" data-act="wipe-all">${icon('trash')}Start empty</button></div>
+    </div>`;
+  };
+
+  /* ---------- finish a password reset after the email link lands back here ---------- */
+  V.modals.resetpw = () => {
+    const r = ui.reset;
+    return `<div class="m-head"><span class="eyebrow">Reset password</span>${closeBtn}</div>
+    <div class="m-body">
+      <p class="muted">Choose a new password for your dayleaf account.</p>
+      <div class="sec-form text" data-row-sync>
+        ${pwField('pw', 'New password', 'new-password')}
+        ${pwField('pwConf', 'Confirm new password', 'new-password')}
+        <div class="sec-btns"><button class="btn primary sm" data-act="resetpw-save">Save new password</button></div>
+      </div>
+      <p class="sec-msg${r.msg ? ' show' : ''} ${r.ok ? 'ok' : ''}" role="status">${esc(r.msg || '')}</p>
     </div>`;
   };
 })(window);

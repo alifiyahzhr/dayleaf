@@ -183,7 +183,7 @@
       ready = cb;
       const m = meta();
       if (!m) { L.mode = 'setup1'; L.first = ''; showLock(); }
-      else if (m.mode === 'none') cb(localStorage.getItem(PLAIN), null);
+      else if (m.mode === 'none') { document.body.classList.remove('locked'); cb(localStorage.getItem(PLAIN), null); }
       else { L.mode = 'unlock'; showLock(); }
     },
     persist(str) {

@@ -71,7 +71,7 @@
   function closeModal() {
     if (!ui.modal || ui.closing) return;
     ui.closing = true; paint(false);
-    setTimeout(() => { ui.modal = null; ui.closing = false; ui.sec = { step: 'idle', msg: '' }; ui.restore = null; ui.restoreErr = ''; paint(false); }, 190);
+    setTimeout(() => { ui.modal = null; ui.closing = false; ui.sec = { step: 'idle', msg: '' }; ui.restore = null; ui.restoreErr = ''; ui.sync = Object.assign({}, ui.sync, { msg: '', pullPreview: null }); ui.reset = { msg: '', ok: false }; paint(false); }, 190);
   }
 
   /* ---------- data helpers ---------- */
@@ -448,6 +448,89 @@
       } catch (e) { el.disabled = false; msg(e.message || 'Something went wrong.'); }
     },
 
+    /* cloud sync */
+    'sync-mode': el => { ui.sync = Object.assign({}, ui.sync, { mode: el.dataset.v, msg: '' }); refresh(); },
+    'sync-auth': async el => {
+      const row = el.closest('[data-row-sync]'), v = f => (row.querySelector(`[data-f="${f}"]`) || {}).value || '';
+      const email = v('email'), pw = v('pw');
+      if (!email || pw.length < 6) { ui.sync = Object.assign({}, ui.sync, { msg: 'Enter an email and a password of at least 6 characters.', ok: false }); return refresh(); }
+      el.disabled = true;
+      try {
+        if (ui.sync.mode === 'signup') {
+          const r = await Sync.signUp(email, pw);
+          ui.sync = Object.assign({}, ui.sync, { msg: r.confirmEmail ? 'Check your email to confirm your account, then sign in.' : 'Account created and signed in.', ok: true });
+        } else {
+          await Sync.signIn(email, pw);
+          ui.sync = Object.assign({}, ui.sync, { msg: '', ok: true });
+        }
+        refresh();
+      } catch (e) { el.disabled = false; ui.sync = Object.assign({}, ui.sync, { msg: e.message || 'Something went wrong.', ok: false }); refresh(); }
+    },
+    'sync-unlock': async el => {
+      const row = el.closest('[data-row-sync]'), pass = (row.querySelector('[data-f="pass"]') || {}).value || '';
+      if (!pass) return;
+      el.disabled = true;
+      try {
+        await Sync.setPassphrase(pass);
+        const p = await Sync.preview();
+        ui.sync = Object.assign({}, ui.sync, { pullPreview: p, msg: p ? '' : 'Nothing to restore yet.', ok: true });
+        refresh();
+      } catch (e) {
+        Sync.forgetPassphrase(); Sync.needsPassphrase = true; el.disabled = false;
+        ui.sync = Object.assign({}, ui.sync, { msg: e.message || 'Could not unlock.', ok: false }); refresh();
+      }
+    },
+    'sync-enc-save': async el => {
+      const row = el.closest('[data-row-sync]'), v = f => (row.querySelector(`[data-f="${f}"]`) || {}).value || '';
+      const pass = v('pass');
+      if (pass.length < 4) { ui.sync = Object.assign({}, ui.sync, { msg: 'Use a passphrase of at least 4 characters.', ok: false }); return refresh(); }
+      if (pass !== v('passConf')) { ui.sync = Object.assign({}, ui.sync, { msg: 'The two passphrases don’t match.', ok: false }); return refresh(); }
+      el.disabled = true;
+      try {
+        await Sync.setPassphrase(pass); await Sync.push();
+        ui.sync = Object.assign({}, ui.sync, { encDecided: true, msg: 'Encryption enabled. This device is now synced.', ok: true }); refresh();
+      } catch (e) { el.disabled = false; ui.sync = Object.assign({}, ui.sync, { msg: e.message || 'Something went wrong.', ok: false }); refresh(); }
+    },
+    'sync-enc-skip': async () => {
+      Sync.useNoEncryption(); ui.sync = Object.assign({}, ui.sync, { encDecided: true });
+      try { await Sync.push(); ui.sync = Object.assign({}, ui.sync, { msg: 'Synced without encryption.', ok: true }); } catch (e) { ui.sync = Object.assign({}, ui.sync, { msg: e.message || 'Something went wrong.', ok: false }); }
+      refresh();
+    },
+    'sync-now': async el => {
+      el.disabled = true;
+      try {
+        const p = await Sync.preview();
+        if (!p) { await Sync.push(); ui.sync = Object.assign({}, ui.sync, { msg: 'Synced — this device’s data is now on the cloud.', ok: true }); }
+        else ui.sync = Object.assign({}, ui.sync, { pullPreview: p, msg: '' });
+        refresh();
+      } catch (e) { el.disabled = false; ui.sync = Object.assign({}, ui.sync, { msg: e.message || 'Something went wrong.', ok: false }); refresh(); }
+    },
+    'sync-pull-confirm': () => {
+      const data = ui.sync.pullPreview.data; ui.sync = Object.assign({}, ui.sync, { pullPreview: null });
+      S.load(JSON.stringify(data)); closeModal(); paint(true); toast('Synced from the cloud');
+    },
+    'sync-pull-cancel': () => { ui.sync = Object.assign({}, ui.sync, { pullPreview: null }); refresh(); },
+    'sync-signout': async () => { await Sync.signOut(); ui.sync = { mode: 'signin', msg: '', ok: false, pullPreview: null }; refresh(); },
+    'sync-reset-request': async el => {
+      const row = el.closest('[data-row-sync]'), email = (row.querySelector('[data-f="email"]') || {}).value || '';
+      if (!email) { ui.sync = Object.assign({}, ui.sync, { msg: 'Enter your email.', ok: false }); return refresh(); }
+      el.disabled = true;
+      try { await Sync.requestReset(email); ui.sync = Object.assign({}, ui.sync, { msg: 'If that email has an account, a reset link is on its way.', ok: true }); }
+      catch (e) { ui.sync = Object.assign({}, ui.sync, { msg: e.message || 'Something went wrong.', ok: false }); }
+      el.disabled = false; refresh();
+    },
+    'resetpw-save': async el => {
+      const row = el.closest('[data-row-sync]'), v = f => (row.querySelector(`[data-f="${f}"]`) || {}).value || '';
+      const pw = v('pw');
+      if (pw !== v('pwConf')) { ui.reset = { msg: 'The two passwords don’t match.', ok: false }; return refresh(); }
+      el.disabled = true;
+      try {
+        await Sync.completeReset(pw);
+        ui.reset = { msg: '', ok: false }; toast('Password updated — you’re signed in.');
+        openModal({ type: 'profile' });
+      } catch (e) { el.disabled = false; ui.reset = { msg: e.message || 'Something went wrong.', ok: false }; refresh(); }
+    },
+
     'cal-prev': () => { const c = ui.cal; ui.cal = c.m === 0 ? { y: c.y - 1, m: 11 } : { y: c.y, m: c.m - 1 }; refresh(); },
     'cal-next': () => { const c = ui.cal; ui.cal = c.m === 11 ? { y: c.y + 1, m: 0 } : { y: c.y, m: c.m + 1 }; refresh(); },
     'quote-next': () => { ui.quote++; refresh(); },
@@ -543,6 +626,14 @@
     'all-years': el => { ui.allYears = el.checked; refresh(); },
   };
   document.addEventListener('change', e => { const el = e.target.closest('[data-change]'); if (el && S.s && C[el.dataset.change]) C[el.dataset.change](el); });
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-pw-toggle]'); if (!b) return;
+    const inp = b.previousElementSibling; if (!inp) return;
+    const show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    b.innerHTML = U.icon(show ? 'eyeOff' : 'eye');
+    b.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+  });
 
   /* ---------- keyboard ---------- */
   const E = { 'task-add': A['task-add'], 'goal-add': A['goal-add'], 'event-add': A['event-add'], 'trait-add': A['trait-add'], 'value-add': A['value-add'], 'affirm-add': A['affirm-add'] };
@@ -590,10 +681,11 @@
 
   /* ---------- boot ---------- */
   let savingT;
-  S.onSave = () => { app.classList.add('saving'); clearTimeout(savingT); savingT = setTimeout(() => app.classList.remove('saving'), 800); };
+  S.onSave = () => { app.classList.add('saving'); clearTimeout(savingT); savingT = setTimeout(() => app.classList.remove('saving'), 800); Sync.schedulePush(); };
   S.onError = () => toast('Storage is full — try removing large photos or board images.');
   S.sub(refresh);
   window.addEventListener('beforeunload', () => { if (S.s) S.write(); });
+  if (Sync.isSignedIn()) Sync.checkRemote().catch(() => { /* retried from Settings */ });
   window.addEventListener('hashchange', go);
 
   Security.onLock = () => {
@@ -613,6 +705,7 @@
     ui.photoIdx = 0;
     if (!location.hash) history.replaceState(null, '', '#/dashboard');
     first = true; go();
+    if (Sync.pendingRecovery) openModal({ type: 'resetpw' });
   }
   Security.run((data, newPin) => {
     S.load(data);
