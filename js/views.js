@@ -352,10 +352,10 @@
         ${card('sec-journal', 'Journal', `<button class="btn sm" data-act="daily-mode" data-v="write">${icon('pencil')}${j && j.body ? 'Keep writing' : 'Start writing'}</button>`,
           j && (j.body || j.title) ? `<div class="journal-peek"><b>${esc(j.title || 'Untitled entry')}</b><p>${esc(j.body.slice(0, 220))}${j.body.length > 220 ? '…' : ''}</p></div>` : empty('Nothing written yet. Switch to Write for a distraction-free page.'))}
         ${card('sec-notes', 'Notes', `<button class="btn sm" data-act="note-add" data-day="${day}">${icon('plus')}New note</button>`,
-            `<div class="notes">${notes.map(n => `<article class="note" data-key="${n.id}">
-            <div class="note-top"><span>${n.createdAt > 1e12 ? new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Note'}</span><button class="icon-btn sm ghost" data-act="note-del" data-id="${n.id}" aria-label="Delete note">${icon('trash')}</button></div>
+            `<div class="notes">${notes.map(n => { const np = n.projectId && S.project(n.projectId); return `<article class="note" data-key="${n.id}">
+            <div class="note-top"><span>${n.createdAt > 1e12 ? new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Note'}</span>${np ? `<button class="chip proj ${np.cover}" data-act="project-open" data-id="${np.id}">${esc(np.title)}</button>` : ''}<button class="icon-btn sm ghost" data-act="note-del" data-id="${n.id}" aria-label="Delete note">${icon('trash')}</button></div>
             <input class="note-title" value="${esc(n.title)}" placeholder="Title" data-input="note-title" data-id="${n.id}" aria-label="Note title">
-            <textarea class="note-body" rows="3" placeholder="Write something…" data-input="note-body" data-id="${n.id}" aria-label="Note">\n${esc(n.body)}</textarea></article>`).join('') || empty('Quick thoughts and ideas. Add your first note.')}</div>`)}
+            <textarea class="note-body" rows="3" placeholder="Write something…" data-input="note-body" data-id="${n.id}" aria-label="Note">\n${esc(n.body)}</textarea></article>`; }).join('') || empty('Quick thoughts and ideas. Add your first note.')}</div>`)}
       </div>
     </div>
 
@@ -630,6 +630,12 @@
       <h3 class="m-h">${icon('flag')}Linked goals</h3>
       <div class="goal-list">${linked.map(x => goalRow(x, { noParent: true })).join('') || empty('Not linked to a goal yet.')}</div>
       ${free.length ? `<label class="m-link">${icon('link')}<select data-change="project-link-goal" data-id="${id}"><option value="">Link to a goal…</option>${free.map(x => opt(x.id, `${HNAME[x.horizon]} · ${x.title}`)).join('')}</select></label>` : ''}
+      <h3 class="m-h">${icon('file')}Notes <small>Also appears in that day’s daily entry</small></h3>
+      <div class="notes">${S.notesForProject(id).map(n => `<article class="note" data-key="${n.id}">
+        <div class="note-top"><span>${n.createdAt > 1e12 ? new Date(n.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Note'}</span><button class="icon-btn sm ghost" data-act="note-del" data-id="${n.id}" aria-label="Delete note">${icon('trash')}</button></div>
+        <input class="note-title" value="${esc(n.title)}" placeholder="Title" data-input="note-title" data-id="${n.id}" aria-label="Note title">
+        <textarea class="note-body" rows="3" placeholder="Write something…" data-input="note-body" data-id="${n.id}" aria-label="Note">\n${esc(n.body)}</textarea></article>`).join('') || empty('No notes yet. Jot down ideas, references or anything else for this project.')}</div>
+      <button class="btn sm" data-act="note-add" data-project="${id}">${icon('plus')}New note</button>
       <div class="m-foot"><button class="btn ghost" data-act="project-pin" data-id="${id}">${icon('pin')}${p.pinned ? 'Unpin from sidebar' : 'Pin to sidebar'}</button><button class="btn ghost danger" data-act="project-del" data-id="${id}">${icon('trash')}Delete</button></div>
     </div>`;
   }

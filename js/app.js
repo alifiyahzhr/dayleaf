@@ -310,8 +310,8 @@
     'mood-set': el => S.set(s => { const d = el.dataset.day, v = Number(el.dataset.v); if (s.moods[d] === v) delete s.moods[d]; else s.moods[d] = v; }),
     'note-add': el => {
       const id = uid();
-      S.set(s => s.notes.push({ id, date: el.dataset.day, title: '', body: '', createdAt: Date.now() }));
-      requestAnimationFrame(() => requestAnimationFrame(() => view.querySelector(`input[data-id="${id}"]`)?.focus()));
+      S.set(s => s.notes.push({ id, date: el.dataset.day || D.today(), title: '', body: '', createdAt: Date.now(), projectId: el.dataset.project || null }));
+      requestAnimationFrame(() => requestAnimationFrame(() => (mroot.querySelector(`input[data-id="${id}"]`) || view.querySelector(`input[data-id="${id}"]`))?.focus()));
     },
     'note-del': el => S.set(s => { s.notes = s.notes.filter(n => n.id !== el.dataset.id); }),
 

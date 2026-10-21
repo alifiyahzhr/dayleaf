@@ -566,6 +566,11 @@ body.locked #app, body.locked #modal-root, body.locked #toast-root { display: no
 .lk-go { width: 100%; margin: 2px 0 6px; padding: 12px; }
 .lk-go[disabled] { opacity: .45; pointer-events: none; }
 .lk-actions { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; justify-content: center; }
+.lk-seg { width: 100%; margin-top: 20px; }
+.lk-form { width: 100%; display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.lk-input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px; outline: none; background: var(--panel); text-align: left; transition: border-color .2s, box-shadow .2s; }
+.lk-input:focus { border-color: var(--blue-400); box-shadow: 0 0 0 3px var(--sky-100); }
+.lk-form .pw-field input { padding-right: 40px; }
 
 /* ---------- photo widget ---------- */
 .photo-card { padding: 0; overflow: hidden; display: flex; flex-direction: column; min-height: 340px; }

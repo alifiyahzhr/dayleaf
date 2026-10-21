@@ -78,10 +78,10 @@
     list.sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
     if (ui.notesSort === 'new') list.reverse();
     const mode = !ui.allYears && ui.nBrowse === 'year' ? 'month' : ui.nBrowse;
-    const card = n => `<article class="note" data-key="${n.id}">
-      <div class="note-top"><span>${n.createdAt > 1e12 ? new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Note'}</span><button class="icon-btn sm ghost" data-act="note-del" data-id="${n.id}" aria-label="Delete note">${icon('trash')}</button></div>
+    const card = n => { const np = n.projectId && S.project(n.projectId); return `<article class="note" data-key="${n.id}">
+      <div class="note-top"><span>${n.createdAt > 1e12 ? new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Note'}</span>${np ? `<button class="chip proj ${np.cover}" data-act="project-open" data-id="${np.id}">${esc(np.title)}</button>` : ''}<button class="icon-btn sm ghost" data-act="note-del" data-id="${n.id}" aria-label="Delete note">${icon('trash')}</button></div>
       <input class="note-title" value="${esc(n.title)}" placeholder="Title" data-input="note-title" data-id="${n.id}" aria-label="Note title">
-      <textarea class="note-body" rows="3" placeholder="Write something…" data-input="note-body" data-id="${n.id}" aria-label="Note">\n${esc(n.body)}</textarea></article>`;
+      <textarea class="note-body" rows="3" placeholder="Write something…" data-input="note-body" data-id="${n.id}" aria-label="Note">\n${esc(n.body)}</textarea></article>`; };
     const dayGroups = arr => { const gs = []; arr.forEach(n => { let gr = gs[gs.length - 1]; if (!gr || gr.date !== n.date) { gr = { date: n.date, list: [] }; gs.push(gr); } gr.list.push(n); }); return gs; };
     const dayBlock = gr => `<section class="n-group" data-key="${gr.date}"><div class="section-title"><h2>${D.long(gr.date)}${gr.date === t ? ' <em class="today-tag">Today</em>' : ''}</h2><a class="link" href="#/daily/${gr.date}">Open daily entry ${icon('arrowUR')}</a></div><div class="notes-grid stagger">${gr.list.map(card).join('')}</div></section>`;
     const byId = {}; list.forEach(n => { byId[n.id] = n; });

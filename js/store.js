@@ -162,7 +162,15 @@
     }
     for (const k in s.journal) { const j = s.journal[k]; if (j.html == null) j.html = U.plainToHtml(j.body); }
     s.habits.forEach(h => { if (!h.days) h.days = [0, 1, 2, 3, 4, 5, 6]; });
+    s.notes.forEach(n => { if (n.projectId === undefined) n.projectId = null; });
     if (s.user && s.user.name === 'Zack') s.user.name = 'Leaf';
+  }
+
+  /* a brand-new account: same user/prefs shape as the demo, none of its content */
+  function emptyState() {
+    const s = seed();
+    Object.assign(s, { habitLog: {}, projects: [], tasks: [], goals: [], notes: [], canvases: {}, moods: {}, moodNotes: {}, focus: {}, events: [], journal: {}, photos: [], banners: { all: '', year: '', month: '', week: '', day: '' }, years: {}, prefs: Object.assign({}, s.prefs, { lifeSeeded: true }), about: { identity: '', traits: [], values: [], affirmations: [], affirmDone: {}, wheel: defaultAbout(() => '').wheel, letters: [] } });
+    return s;
   }
 
   function defaultAbout(d) {
@@ -194,7 +202,7 @@
     load(str) {
       this.s = null;
       try { if (str) this.s = JSON.parse(str); } catch (e) { /* ignore */ }
-      if (!this.s || this.s.v !== 2) this.s = seed();
+      if (!this.s || this.s.v !== 2) this.s = emptyState();
       migrate(this.s);
       this.write();
     },
@@ -215,11 +223,7 @@
     },
     set(fn) { fn(this.s); this.save(); this.emit(); },
     reset() { this.s = seed(); this.write(); this.emit(); },
-    wipe() {
-      const s = seed();
-      Object.assign(s, { habitLog: {}, projects: [], tasks: [], goals: [], notes: [], canvases: {}, moods: {}, moodNotes: {}, focus: {}, events: [], journal: {}, photos: [], banners: { all: '', year: '', month: '', week: '', day: '' }, years: {}, prefs: Object.assign({}, s.prefs, { lifeSeeded: true }), about: { identity: '', traits: [], values: [], affirmations: [], affirmDone: {}, wheel: defaultAbout(() => '').wheel, letters: [] } });
-      this.s = s; this.write(); this.emit();
-    },
+    wipe() { this.s = emptyState(); this.write(); this.emit(); },
 
     /* ----- lookups ----- */
     project: id => Store.s.projects.find(p => p.id === id),
@@ -233,6 +237,7 @@
     tasksIn(h, p) { const [a, b] = D.range(h, p); return this.s.tasks.filter(t => t.date && t.date >= a && t.date <= b); },
     inbox: () => Store.s.tasks.filter(t => !t.date && !t.done),
     notesOn: day => Store.s.notes.filter(n => n.date === day).sort((a, b) => a.createdAt - b.createdAt),
+    notesForProject: pid => Store.s.notes.filter(n => n.projectId === pid).sort((a, b) => b.createdAt - a.createdAt),
     recentNotes(n) { return [...this.s.notes].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt).slice(0, n); },
     goalsFor: (h, p) => Store.s.goals.filter(x => x.horizon === h && x.period === p),
     goalsOn(day) { return ['year', 'month', 'week', 'day'].map(h => ({ h, p: D.periodOf(h, day), list: this.goalsFor(h, D.periodOf(h, day)) })); },

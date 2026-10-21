@@ -2,7 +2,7 @@
    Everything stays on this device. With a PIN set, your data is stored as an AES-GCM vault whose key
    is derived from the PIN (PBKDF2-SHA256), so it is unreadable in browser storage without the PIN. */
 (function (g) {
-  const { icon } = U;
+  const { icon, esc } = U;
   const META = 'dayleaf.sec', VAULT = 'dayleaf.vault', PLAIN = 'dayleaf.v2';
   const ITER = 300000;
   const te = new TextEncoder(), td = new TextDecoder();
@@ -69,7 +69,7 @@
 
   /* ---------- lock screen ---------- */
   const el = () => document.getElementById('lock');
-  const L = { active: false, mode: 'unlock', pin: '', first: '', msg: '', shake: false, busy: false, armed: false, tick: null };
+  const L = { active: false, mode: 'unlock', pin: '', first: '', msg: '', shake: false, busy: false, armed: false, tick: null, cloud: { tab: 'signin', msg: '', busy: false } };
   let ready = null, idleT = null, hiddenAt = 0;
 
   const lockedFor = () => { const m = meta(); return m && m.until && m.until > Date.now() ? Math.ceil((m.until - Date.now()) / 1000) : 0; };
@@ -91,6 +91,34 @@
       return `<div class="lock-card"><span class="lk-logo">${icon('shield')}</span><h2>${titles[0]}</h2><p class="lk-sub">${titles[1]}</p>
         <div class="lk-actions"><button class="btn" data-lk="back">Back</button><button class="btn danger${L.armed ? ' armed' : ''}" data-lk="erase">${L.armed ? 'Tap again to erase everything' : 'Erase everything'}</button></div></div>`;
     }
+    if (L.mode === 'cloud') {
+      const c = L.cloud;
+      return `<div class="lock-card">
+        <span class="lk-logo">${icon('cloud')}</span>
+        <h2>Sign in to sync</h2><p class="lk-sub">${c.tab === 'signup' ? 'Create an account to sync your data across devices.' : 'Sign in to pull your data down to this device.'}</p>
+        <div class="seg lk-seg"><button class="${c.tab === 'signin' ? 'on' : ''}" data-lkc="tab" data-v="signin" ${c.busy ? 'disabled' : ''}>Sign in</button><button class="${c.tab === 'signup' ? 'on' : ''}" data-lkc="tab" data-v="signup" ${c.busy ? 'disabled' : ''}>Sign up</button></div>
+        <div class="lk-form">
+          <input type="email" class="lk-input" autocomplete="email" placeholder="Email" data-lkf="email" aria-label="Email" ${c.busy ? 'disabled' : ''}>
+          <div class="pw-field"><input type="password" class="lk-input" autocomplete="${c.tab === 'signup' ? 'new-password' : 'current-password'}" placeholder="Password" data-lkf="pw" aria-label="Password" ${c.busy ? 'disabled' : ''}><button type="button" class="icon-btn sm pw-eye" data-pw-toggle tabindex="-1" aria-label="Show password">${icon('eye')}</button></div>
+        </div>
+        <p class="lk-msg${c.msg ? ' show' : ''}">${esc(c.msg)}</p>
+        <button class="btn primary lk-go" data-lk="cloud-submit" ${c.busy ? 'disabled' : ''}>${c.tab === 'signup' ? 'Create account' : 'Sign in'}</button>
+        <button class="lk-link" data-lk="cloud-back">Back</button>
+      </div>`;
+    }
+    if (L.mode === 'cloud-pass') {
+      const c = L.cloud;
+      return `<div class="lock-card">
+        <span class="lk-logo">${icon('cloud')}</span>
+        <h2>Enter your sync passphrase</h2><p class="lk-sub">Your cloud data is encrypted. Enter the passphrase you set on your other device to unlock it here.</p>
+        <div class="lk-form">
+          <div class="pw-field"><input type="password" class="lk-input" placeholder="Sync passphrase" data-lkf="pass" aria-label="Sync passphrase" ${c.busy ? 'disabled' : ''}><button type="button" class="icon-btn sm pw-eye" data-pw-toggle tabindex="-1" aria-label="Show password">${icon('eye')}</button></div>
+        </div>
+        <p class="lk-msg${c.msg ? ' show' : ''}">${esc(c.msg)}</p>
+        <button class="btn primary lk-go" data-lk="cloud-pass-submit" ${c.busy ? 'disabled' : ''}>Unlock</button>
+        <button class="lk-link" data-lk="cloud">Use a different account</button>
+      </div>`;
+    }
     return `<div class="lock-card">
       <img class="lk-bunny" src="assets/mascot.png" alt="" draggable="false">
       <span class="lk-logo">${icon(L.mode === 'unlock' ? 'lock' : 'shield')}</span>
@@ -98,7 +126,7 @@
       <div class="lk-dots${L.shake ? ' shake' : ''}${L.busy ? ' busy' : ''}">${dots}</div>
       <p class="lk-msg${wait || L.msg ? ' show' : ''}">${wait ? `Too many attempts. Try again in ${fmt(wait)}` : L.msg}</p>
       <div class="lk-pad">${pad}</div>
-      ${L.mode === 'setup1' ? `<button class="btn primary lk-go" data-lk="next" ${L.pin.length >= 4 ? '' : 'disabled'}>Continue</button><button class="lk-link" data-lk="skip">Not now</button>` : ''}
+      ${L.mode === 'setup1' ? `<button class="btn primary lk-go" data-lk="next" ${L.pin.length >= 4 ? '' : 'disabled'}>Continue</button><button class="lk-link" data-lk="skip">Not now</button><button class="lk-link" data-lk="cloud">Sign in to sync instead</button>` : ''}
       ${L.mode === 'setup2' ? `<button class="lk-link" data-lk="restart">Start over</button>` : ''}
       ${L.mode === 'unlock' ? `<button class="lk-link" data-lk="forgot">Forgot PIN?</button>` : ''}
     </div>`;
@@ -163,6 +191,53 @@
       localStorage.removeItem(VAULT); localStorage.removeItem(PLAIN); localStorage.removeItem(META);
       key = null; L.mode = 'setup1'; L.first = ''; L.pin = ''; L.armed = false; paintLock();
     }
+    if (a === 'cloud') { L.mode = 'cloud'; L.cloud = { tab: 'signin', msg: '', busy: false }; paintLock(); }
+    if (a === 'cloud-back') { L.mode = 'setup1'; L.pin = ''; paintLock(); }
+    if (a === 'cloud-submit') cloudSubmit();
+    if (a === 'cloud-pass-submit') cloudPassSubmit();
+  }
+  function cloudTab(v) { L.cloud = Object.assign({}, L.cloud, { tab: v, msg: '' }); paintLock(); }
+
+  /* a fresh sign-in may already have data waiting in the cloud — skip local PIN setup and load it */
+  async function afterCloudAuth() {
+    if (g.Sync.needsPassphrase) { L.mode = 'cloud-pass'; L.cloud = Object.assign({}, L.cloud, { busy: false, msg: '' }); paintLock(); return; }
+    try {
+      const p = await g.Sync.preview();
+      setMeta({ mode: 'none', autoLock: 5 });
+      hideLock(); ready(p ? JSON.stringify(p.data) : null, null);
+    } catch (e) {
+      if (e.code === 'passphrase-needed') { L.mode = 'cloud-pass'; L.cloud = Object.assign({}, L.cloud, { busy: false, msg: '' }); paintLock(); }
+      else { L.cloud = Object.assign({}, L.cloud, { busy: false, msg: e.message || 'Something went wrong.' }); paintLock(); }
+    }
+  }
+  async function cloudSubmit() {
+    if (L.cloud.busy) return;
+    const card = el().querySelector('.lock-card');
+    const email = (card.querySelector('[data-lkf="email"]') || {}).value || '', pw = (card.querySelector('[data-lkf="pw"]') || {}).value || '';
+    if (!email || pw.length < 6) { L.cloud = Object.assign({}, L.cloud, { msg: 'Enter an email and a password of at least 6 characters.' }); return paintLock(); }
+    L.cloud = Object.assign({}, L.cloud, { busy: true, msg: '' }); paintLock();
+    try {
+      if (L.cloud.tab === 'signup') {
+        const r = await g.Sync.signUp(email, pw);
+        if (r.confirmEmail) { L.cloud = Object.assign({}, L.cloud, { busy: false, msg: 'Check your email to confirm your account, then sign in.' }); return paintLock(); }
+      } else await g.Sync.signIn(email, pw);
+      await afterCloudAuth();
+    } catch (e) { L.cloud = Object.assign({}, L.cloud, { busy: false, msg: e.message || 'Something went wrong.' }); paintLock(); }
+  }
+  async function cloudPassSubmit() {
+    if (L.cloud.busy) return;
+    const pass = (el().querySelector('[data-lkf="pass"]') || {}).value || '';
+    if (!pass) return;
+    L.cloud = Object.assign({}, L.cloud, { busy: true, msg: '' }); paintLock();
+    try {
+      await g.Sync.setPassphrase(pass);
+      const p = await g.Sync.preview();
+      setMeta({ mode: 'none', autoLock: 5 });
+      hideLock(); ready(p ? JSON.stringify(p.data) : null, null);
+    } catch (e) {
+      g.Sync.forgetPassphrase(); g.Sync.needsPassphrase = true;
+      L.cloud = Object.assign({}, L.cloud, { busy: false, msg: e.message || 'Could not unlock.' }); paintLock();
+    }
   }
 
   /* ---------- idle auto-lock ---------- */
@@ -225,12 +300,17 @@
   document.addEventListener('DOMContentLoaded', () => {
     const e = el();
     e.addEventListener('click', ev => {
-      const k = ev.target.closest('[data-k]'), b = ev.target.closest('[data-back]'), a = ev.target.closest('[data-lk]');
-      if (k) press(k.dataset.k); else if (b) back(); else if (a) lkAction(a.dataset.lk);
+      const k = ev.target.closest('[data-k]'), b = ev.target.closest('[data-back]'), a = ev.target.closest('[data-lk]'), t = ev.target.closest('[data-lkc]');
+      if (k) press(k.dataset.k); else if (b) back(); else if (a) lkAction(a.dataset.lk); else if (t) cloudTab(t.dataset.v);
     });
   });
   document.addEventListener('keydown', ev => {
-    if (!L.active || L.mode === 'forgot') return;
+    if (!L.active) return;
+    if (L.mode === 'cloud' || L.mode === 'cloud-pass') {
+      if (ev.key === 'Enter') { ev.preventDefault(); lkAction(L.mode === 'cloud' ? 'cloud-submit' : 'cloud-pass-submit'); }
+      return;
+    }
+    if (L.mode === 'forgot') return;
     if (/^\d$/.test(ev.key)) { ev.preventDefault(); press(ev.key); }
     else if (ev.key === 'Backspace') { ev.preventDefault(); back(); }
     else if (ev.key === 'Enter') { ev.preventDefault(); if (L.mode === 'unlock') submitUnlock(); else if (L.mode === 'setup1') lkAction('next'); }
