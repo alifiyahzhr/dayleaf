@@ -194,7 +194,7 @@
 
     <div class="grid-2 wide-left">
       ${card('', 'Today’s tasks', `<span class="muted">${doneN} of ${tasks.length} complete</span>`,
-      `${tasks.length ? bar(doneN / tasks.length, 'slim') : ''}<div class="task-list">${tasks.map(x => taskRow(x, { edit: false })).join('') || empty('No tasks yet. Add one below.')}</div>
+      `${tasks.length ? bar(doneN / tasks.length, 'slim') : ''}<div class="task-list">${tasks.map(x => taskRow(x, { edit: true })).join('') || empty('No tasks yet. Add one below.')}</div>
        ${addRow('Add a task for today', `data-enter="task-add" data-day="${t}"`, `<button class="btn sm primary" data-act="task-add">Add</button>`)}
        <a class="foot-link" href="#/daily/${t}">Continue in your daily entry ${icon('arrowR')}</a>`)}
 
@@ -413,7 +413,7 @@
       <div class="goal-list">${goals.map(x => goalRow(x)).join('') || empty(`No goals set for this ${h}.`)}</div>
       ${addRow(`Add a ${h} goal`, `data-enter="goal-add" data-h="${h}" data-p="${p}"`)}
       <div class="sub-head">${icon('listcheck')}Scheduled tasks<small>${dn} of ${tasks.length} done</small></div>
-      <div class="task-list">${pend.slice(0, 4).map(x => taskRow(x, { date: h !== 'day' })).join('') || empty(tasks.length ? 'Everything here is done.' : 'No tasks scheduled in this period.')}</div>
+      <div class="task-list">${pend.slice(0, 4).map(x => taskRow(x, { edit: true, date: h !== 'day' })).join('') || empty(tasks.length ? 'Everything here is done.' : 'No tasks scheduled in this period.')}</div>
       ${pend.length > 4 ? `<a class="more" href="#/goals/${h}/${p}">+${pend.length - 4} more tasks</a>` : ''}
     </section>`;
   }
@@ -449,14 +449,14 @@
       }).join('');
       const pend = S.tasksIn('month', p).filter(x => !x.done).sort((a, b) => a.date.localeCompare(b.date));
       return card('', 'Weeks', '', `<div class="week-rows stagger">${rows}</div>`) +
-        card('', 'Upcoming tasks', `<span class="muted">${pend.length} open</span>`, `<div class="task-list">${pend.slice(0, 8).map(x => taskRow(x, { date: true })).join('') || empty('No open tasks this month.')}</div>${pend.length > 8 ? `<p class="empty-line">+${pend.length - 8} more</p>` : ''}`);
+        card('', 'Upcoming tasks', `<span class="muted">${pend.length} open</span>`, `<div class="task-list">${pend.slice(0, 8).map(x => taskRow(x, { edit: true, date: true })).join('') || empty('No open tasks this month.')}</div>${pend.length > 8 ? `<p class="empty-line">+${pend.length - 8} more</p>` : ''}`);
     }
     if (h === 'week') {
       const blocks = D.weekDays(p).map(k => {
         const ts = S.tasksOn(k), dn = ts.filter(x => x.done).length, evs = S.eventsOn(k);
         return `<div class="dblock${k === t ? ' today' : ''}" data-key="${k}"><div class="dhead"><a href="#/daily/${k}"><b>${D.DOW[D.parse(k).getDay()]}</b> ${D.short(k)}</a><small>${ts.length ? `${dn}/${ts.length}` : ''}</small></div>
           ${evs.map(e => `<button class="ev-mini" style="--ev:${U.evHex(e.color)}" data-key="${e.id}" data-act="event-open" data-id="${e.id}"><span class="ev-bar"></span>${e.allDay ? '' : `<small>${fmtTime(e.time)}</small>`}${esc(e.title)}</button>`).join('')}
-          ${ts.map(x => taskRow(x)).join('')}
+          ${ts.map(x => taskRow(x, { edit: true })).join('')}
           ${addRow('Add a task', `data-enter="task-add" data-day="${k}"`)}</div>`;
       }).join('');
       return card('', 'Days', `<span class="muted">Tasks added here appear in that day’s entry</span>`, `<div class="day-blocks stagger">${blocks}</div>`);
@@ -599,46 +599,57 @@
   };
 
   const CRUMB = { dashboard: 'Dashboard', daily: 'Daily Entry', journal: 'Journal', notes: 'Notes', calendar: 'Calendar', habits: 'Habit Tracker', projects: 'Personal Projects', goals: 'Future Goals', about: 'About Me' };
-  V.title = () => CRUMB[App.route.name];
+  const crumbFor = r => r.name === 'project' ? ((S.project(r.params.id) || {}).title || 'Project') : CRUMB[r.name];
+  V.title = () => crumbFor(App.route);
   V.topbar = () => `<button class="icon-btn menu-btn" data-act="nav-open" aria-label="Open menu">${icon('menu')}</button>
-    <nav class="crumbs" aria-label="Breadcrumb"><span>My workspace</span><i>/</i><b>${CRUMB[App.route.name]}</b></nav>
+    <nav class="crumbs" aria-label="Breadcrumb"><span>My workspace</span><i>/</i><b>${esc(crumbFor(App.route))}</b></nav>
     <div class="top-right"><button class="year-chip${D.anchor ? ' away' : ''}" data-act="year-open" title="Switch year">${icon('calendar')}<b>${D.today().slice(0, 4)}</b>${icon('chevD')}</button><span class="saved">${icon('check')}<span>All changes saved</span></span>
     <button class="icon-btn" data-act="search-open" aria-label="Search">${icon('search')}</button></div>`;
 
-  /* ---------- modals (other files register more in V.modals) ---------- */
-  function projectModal(id) {
-    const p = S.project(id); if (!p) return null;
+  /* ---------- project (full page) ---------- */
+  V.project = r => {
+    const id = r.params.id, p = S.project(id);
+    if (!p) return `<a class="proj-back" href="#/projects">${icon('chevL')}All projects</a>${empty('This project no longer exists.')}`;
     const st = S.projectStats(p), ts = S.s.tasks.filter(x => x.projectId === id);
     const linked = S.s.goals.filter(x => x.projectId === id), free = S.s.goals.filter(x => x.projectId !== id && x.horizon !== 'day');
+    const journal = S.journalForProject(id);
     return `
-    <div class="m-cover ${p.cover}"><span class="pc-icon">${icon(p.icon)}</span>
-      <div class="m-cover-tools"><div class="dots" role="group" aria-label="Cover colour">${(ui.moreColors || MORE_COVERS.includes(p.cover) ? COVERS.concat(MORE_COVERS) : COVERS).map(c => `<button class="cdot ${c}${p.cover === c ? ' on' : ''}" data-act="project-cover" data-id="${id}" data-v="${c}" aria-label="Cover ${c}"></button>`).join('')}<button class="cdot-more" data-act="colors-more" title="${ui.moreColors ? 'Fewer colours' : 'More colours'}" aria-label="${ui.moreColors ? 'Fewer colours' : 'More colours'}">${icon(ui.moreColors ? 'minus' : 'plus')}</button></div>
-      <div class="icons" role="group" aria-label="Icon">${PICONS.map(c => `<button class="${p.icon === c ? 'on' : ''}" data-act="project-icon" data-id="${id}" data-v="${c}" aria-label="${c}">${icon(c)}</button>`).join('')}</div></div>
-      <button class="icon-btn m-close" data-act="modal-close" aria-label="Close">${icon('x')}</button></div>
-    <div class="m-body">
-      <input class="m-title" value="${esc(p.title)}" data-input="project-title" data-id="${id}" aria-label="Project title" placeholder="Project name">
-      <textarea class="m-desc" rows="2" data-input="project-desc" data-id="${id}" placeholder="What is this project about?" aria-label="Description">\n${esc(p.desc)}</textarea>
-      <div class="m-fields">
-        <label>Status<select data-change="project-status" data-id="${id}">${Object.keys(STATUS).map(k => opt(k, STATUS[k], p.status === k)).join('')}</select></label>
-        <label>Area<select data-change="project-area" data-id="${id}">${AREAS.map(a => opt(a, a, p.area === a)).join('')}</select></label>
-        <label>Target date<input type="date" value="${p.due || ''}" data-change="project-due" data-id="${id}"></label>
+    <a class="proj-back" href="#/projects">${icon('chevL')}All projects</a>
+    <div class="proj-page">
+      <div class="m-cover ${p.cover}"><span class="pc-icon">${icon(p.icon)}</span>
+        <div class="m-cover-tools"><div class="dots" role="group" aria-label="Cover colour">${(ui.moreColors || MORE_COVERS.includes(p.cover) ? COVERS.concat(MORE_COVERS) : COVERS).map(c => `<button class="cdot ${c}${p.cover === c ? ' on' : ''}" data-act="project-cover" data-id="${id}" data-v="${c}" aria-label="Cover ${c}"></button>`).join('')}<button class="cdot-more" data-act="colors-more" title="${ui.moreColors ? 'Fewer colours' : 'More colours'}" aria-label="${ui.moreColors ? 'Fewer colours' : 'More colours'}">${icon(ui.moreColors ? 'minus' : 'plus')}</button></div>
+        <div class="icons" role="group" aria-label="Icon">${PICONS.map(c => `<button class="${p.icon === c ? 'on' : ''}" data-act="project-icon" data-id="${id}" data-v="${c}" aria-label="${c}">${icon(c)}</button>`).join('')}</div></div>
       </div>
-      <div class="m-progress"><div><b>${pct(st.pct)}%</b><small>${st.done} of ${st.total} tasks done</small></div>${bar(st.pct)}</div>
-      <h3 class="m-h">${icon('listcheck')}Tasks <small>Tasks with a date also appear in that day’s daily entry</small></h3>
+      <div class="m-body">
+        <input class="m-title" value="${esc(p.title)}" data-input="project-title" data-id="${id}" aria-label="Project title" placeholder="Project name">
+        <textarea class="m-desc" rows="2" data-input="project-desc" data-id="${id}" placeholder="What is this project about?" aria-label="Description">\n${esc(p.desc)}</textarea>
+        <div class="m-fields">
+          <label>Status<select data-change="project-status" data-id="${id}">${Object.keys(STATUS).map(k => opt(k, STATUS[k], p.status === k)).join('')}</select></label>
+          <label>Area<select data-change="project-area" data-id="${id}">${AREAS.map(a => opt(a, a, p.area === a)).join('')}</select></label>
+          <label>Target date<input type="date" value="${p.due || ''}" data-change="project-due" data-id="${id}"></label>
+        </div>
+        <div class="m-progress"><div><b>${pct(st.pct)}%</b><small>${st.done} of ${st.total} tasks done</small></div>${bar(st.pct)}</div>
+      </div>
+    </div>
+    ${card('', 'Tasks', '', `<p class="muted">Tasks with a date also appear in that day’s daily entry.</p>
       <div class="task-list">${ts.map(x => taskRow(x, { edit: true, noProject: true, date: true })).join('') || empty('No tasks yet.')}</div>
-      <div class="add-row" data-row><span class="add-ic">${icon('plus')}</span><input class="grow" data-f="title" placeholder="Add a task" data-enter="task-add" data-project="${id}" aria-label="New task"><input type="date" data-f="date" aria-label="Date (optional)"><button class="btn sm primary" data-act="task-add">Add</button></div>
-      <h3 class="m-h">${icon('flag')}Linked goals</h3>
-      <div class="goal-list">${linked.map(x => goalRow(x, { noParent: true })).join('') || empty('Not linked to a goal yet.')}</div>
-      ${free.length ? `<label class="m-link">${icon('link')}<select data-change="project-link-goal" data-id="${id}"><option value="">Link to a goal…</option>${free.map(x => opt(x.id, `${HNAME[x.horizon]} · ${x.title}`)).join('')}</select></label>` : ''}
-      <h3 class="m-h">${icon('file')}Notes <small>Also appears in that day’s daily entry</small></h3>
+      <div class="add-row" data-row><span class="add-ic">${icon('plus')}</span><input class="grow" data-f="title" placeholder="Add a task" data-enter="task-add" data-project="${id}" aria-label="New task"><input type="date" data-f="date" aria-label="Date (optional)"><button class="btn sm primary" data-act="task-add">Add</button></div>`)}
+    ${card('', 'Journal', '', `<p class="muted">Longer, reflective entries about this project — optional, separate from your quick notes below.</p>
+      <div class="notes">${journal.map(j => `<article class="note" data-key="${j.id}">
+        <div class="note-top"><span>${D.long(new Date(j.createdAt).toISOString().slice(0, 10))}</span><button class="icon-btn sm ghost" data-act="pjournal-del" data-id="${j.id}" aria-label="Delete journal entry">${icon('trash')}</button></div>
+        <input class="note-title" value="${esc(j.title)}" placeholder="Title" data-input="pjournal-title" data-id="${j.id}" aria-label="Entry title">
+        <textarea class="note-body" rows="5" placeholder="Write something…" data-input="pjournal-body" data-id="${j.id}" aria-label="Journal entry">\n${esc(j.body)}</textarea></article>`).join('') || empty('No journal entries yet. Write a longer reflection whenever you like.')}</div>
+      <button class="btn sm" data-act="pjournal-add" data-project="${id}">${icon('plus')}New journal entry</button>`)}
+    ${card('', 'Notes', '', `<p class="muted">Quick notes — also appear in that day’s daily entry.</p>
       <div class="notes">${S.notesForProject(id).map(n => `<article class="note" data-key="${n.id}">
         <div class="note-top"><span>${n.createdAt > 1e12 ? new Date(n.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Note'}</span><button class="icon-btn sm ghost" data-act="note-del" data-id="${n.id}" aria-label="Delete note">${icon('trash')}</button></div>
         <input class="note-title" value="${esc(n.title)}" placeholder="Title" data-input="note-title" data-id="${n.id}" aria-label="Note title">
         <textarea class="note-body" rows="3" placeholder="Write something…" data-input="note-body" data-id="${n.id}" aria-label="Note">\n${esc(n.body)}</textarea></article>`).join('') || empty('No notes yet. Jot down ideas, references or anything else for this project.')}</div>
-      <button class="btn sm" data-act="note-add" data-project="${id}">${icon('plus')}New note</button>
-      <div class="m-foot"><button class="btn ghost" data-act="project-pin" data-id="${id}">${icon('pin')}${p.pinned ? 'Unpin from sidebar' : 'Pin to sidebar'}</button><button class="btn ghost danger" data-act="project-del" data-id="${id}">${icon('trash')}Delete</button></div>
-    </div>`;
-  }
+      <button class="btn sm" data-act="note-add" data-project="${id}">${icon('plus')}New note</button>`)}
+    ${card('', 'Linked goals', '', `<div class="goal-list">${linked.map(x => goalRow(x, { noParent: true })).join('') || empty('Not linked to a goal yet.')}</div>
+      ${free.length ? `<label class="m-link">${icon('link')}<select data-change="project-link-goal" data-id="${id}"><option value="">Link to a goal…</option>${free.map(x => opt(x.id, `${HNAME[x.horizon]} · ${x.title}`)).join('')}</select></label>` : ''}`)}
+    <div class="m-foot"><button class="btn ghost" data-act="project-pin" data-id="${id}">${icon('pin')}${p.pinned ? 'Unpin from sidebar' : 'Pin to sidebar'}</button><button class="btn ghost danger" data-act="project-del" data-id="${id}">${icon('trash')}Delete project</button></div>`;
+  };
 
   function goalModal(id) {
     const gl = S.goal(id); if (!gl) return null;
@@ -690,7 +701,7 @@
       <div class="results">${list.map((x, i) => `<button class="res${i === sel ? ' on' : ''}" data-key="${x.kind}${x.id || x.href}" data-act="search-go" data-i="${i}">${icon(x.icon)}<span><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></span>${icon('chevR')}</button>`).join('') || `<p class="empty-line pad">No matches for “${esc(ui.search.q)}”.</p>`}</div>`;
   }
 
-  V.modals = { project: m => projectModal(m.id), goal: m => goalModal(m.id), search: searchModal };
+  V.modals = { goal: m => goalModal(m.id), search: searchModal };
   V.modal = () => {
     const m = ui.modal; if (!m) return '';
     const body = V.modals[m.type](m);

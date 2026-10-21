@@ -8,7 +8,7 @@
   const LEVELS = ['life', 'year', 'month', 'week', 'day'];
   try { if (localStorage.getItem('dayleaf.mascotOff') === '1') document.body.classList.add('no-mascot'); } catch (_) { /* ignore */ }
   const STATUS = { motion: 'In motion', horizon: 'On the horizon', done: 'Completed' };
-  const PAGES = ['dashboard', 'daily', 'journal', 'notes', 'calendar', 'habits', 'projects', 'goals', 'about'];
+  const PAGES = ['dashboard', 'daily', 'journal', 'notes', 'calendar', 'habits', 'projects', 'project', 'goals', 'about'];
 
   /* ---------- routing & painting ---------- */
   const PERIOD_OK = {
@@ -19,6 +19,7 @@
     const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean), t = D.today();
     const name = parts[0] || 'dashboard';
     if (name === 'daily') return { name, params: { day: D.valid(parts[1]) ? parts[1] : t } };
+    if (name === 'project') return { name, params: { id: parts[1] || null } };
     if (name === 'goals') {
       if (parts[1] === 'life') return { name, params: { h: 'life', id: parts[2] || null } };
       const h = HORIZ.includes(parts[1]) ? parts[1] : 'all';
@@ -314,6 +315,12 @@
       requestAnimationFrame(() => requestAnimationFrame(() => (mroot.querySelector(`input[data-id="${id}"]`) || view.querySelector(`input[data-id="${id}"]`))?.focus()));
     },
     'note-del': el => S.set(s => { s.notes = s.notes.filter(n => n.id !== el.dataset.id); }),
+    'pjournal-add': el => {
+      const id = uid();
+      S.set(s => s.projectJournal.push({ id, projectId: el.dataset.project, title: '', body: '', createdAt: Date.now() }));
+      requestAnimationFrame(() => requestAnimationFrame(() => view.querySelector(`input[data-id="${id}"]`)?.focus()));
+    },
+    'pjournal-del': el => S.set(s => { s.projectJournal = s.projectJournal.filter(j => j.id !== el.dataset.id); }),
 
     /* habits */
     'habit-toggle': el => S.set(s => {
@@ -396,10 +403,10 @@
     'project-new': el => {
       const id = uid(), covers = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'];
       S.set(s => s.projects.push({ id, title: 'Untitled project', desc: '', area: 'Creative', status: el.dataset.status || 'motion', cover: covers[s.projects.length % covers.length], icon: 'sprout', pinned: false, due: '', manual: 0 }));
-      openModal({ type: 'project', id });
-      requestAnimationFrame(() => { const i = mroot.querySelector('.m-title'); i?.focus(); i?.select(); });
+      location.hash = `#/project/${id}`;
+      setTimeout(() => { const i = view.querySelector('.m-title'); i?.focus(); i?.select(); }, 200);
     },
-    'project-open': el => openModal({ type: 'project', id: el.dataset.id }),
+    'project-open': el => { location.hash = `#/project/${el.dataset.id}`; },
     'project-del': el => {
       if (!arm(el, 'Click again to delete')) return;
       S.set(s => {
@@ -408,7 +415,7 @@
         s.tasks.forEach(t => { if (t.projectId === id) t.projectId = null; });
         s.goals.forEach(g => { if (g.projectId === id) g.projectId = null; });
       });
-      closeModal();
+      location.hash = '#/projects';
     },
     'project-pin': el => upd('projects', el.dataset.id, p => { p.pinned = !p.pinned; }),
     'project-cover': el => upd('projects', el.dataset.id, p => { p.cover = el.dataset.v; }),
@@ -535,12 +542,12 @@
     const x = V.searchList()[i]; if (!x) return;
     ui.modal = null; ui.closing = false;
     if (x.kind === 'go') { location.hash = x.href; paint(false); return; }
-    if (x.kind === 'project') { paint(false); return openModal({ type: 'project', id: x.id }); }
+    if (x.kind === 'project') { paint(false); location.hash = `#/project/${x.id}`; return; }
     if (x.kind === 'goal') { paint(false); return openModal({ type: 'goal', id: x.id }); }
     if (x.kind === 'event') { paint(false); return openModal({ type: 'event', id: x.id }); }
     if (x.date) { location.hash = `#/daily/${x.date}`; paint(false); return; }
     paint(false);
-    if (x.project) openModal({ type: 'project', id: x.project });
+    if (x.project) location.hash = `#/project/${x.project}`;
   }
 
   document.addEventListener('click', e => {
@@ -557,6 +564,8 @@
     'task-title': el => upd('tasks', el.dataset.id, t => { t.title = el.value; }),
     'note-title': el => upd('notes', el.dataset.id, n => { n.title = el.value; }),
     'note-body': el => upd('notes', el.dataset.id, n => { n.body = el.value; }),
+    'pjournal-title': el => upd('projectJournal', el.dataset.id, j => { j.title = el.value; }),
+    'pjournal-body': el => upd('projectJournal', el.dataset.id, j => { j.body = el.value; }),
     'journal-title': el => jset(el.dataset.day, j => { j.title = el.value; }),
     'journal-body': el => jset(el.dataset.day, j => { j.body = el.value; }),
     'journal-q': el => { ui.journalQ = el.value; refresh(); },

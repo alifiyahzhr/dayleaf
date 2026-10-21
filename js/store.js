@@ -133,7 +133,7 @@
     };
 
     return {
-      v: 2, user: { name: 'Leaf' }, habits, habitLog, projects, tasks, goals, notes, canvases,
+      v: 2, user: { name: 'Leaf' }, habits, habitLog, projects, tasks, goals, notes, projectJournal: [], canvases,
       events, journal, moods, moodNotes, photos: [], prefs: { dailyMode: 'board', photoStyle: 'fill', mascot: true }, about,
       focus: { [yr]: 'Make more. Notice more. Live a little more intentionally.' },
     };
@@ -163,13 +163,14 @@
     for (const k in s.journal) { const j = s.journal[k]; if (j.html == null) j.html = U.plainToHtml(j.body); }
     s.habits.forEach(h => { if (!h.days) h.days = [0, 1, 2, 3, 4, 5, 6]; });
     s.notes.forEach(n => { if (n.projectId === undefined) n.projectId = null; });
+    s.projectJournal = s.projectJournal || [];
     if (s.user && s.user.name === 'Zack') s.user.name = 'Leaf';
   }
 
   /* a brand-new account: same user/prefs shape as the demo, none of its content */
   function emptyState() {
     const s = seed();
-    Object.assign(s, { habitLog: {}, projects: [], tasks: [], goals: [], notes: [], canvases: {}, moods: {}, moodNotes: {}, focus: {}, events: [], journal: {}, photos: [], banners: { all: '', year: '', month: '', week: '', day: '' }, years: {}, prefs: Object.assign({}, s.prefs, { lifeSeeded: true }), about: { identity: '', traits: [], values: [], affirmations: [], affirmDone: {}, wheel: defaultAbout(() => '').wheel, letters: [] } });
+    Object.assign(s, { habits: [], habitLog: {}, projects: [], tasks: [], goals: [], notes: [], projectJournal: [], canvases: {}, moods: {}, moodNotes: {}, focus: {}, events: [], journal: {}, photos: [], banners: { all: '', year: '', month: '', week: '', day: '' }, years: {}, prefs: Object.assign({}, s.prefs, { lifeSeeded: true }), about: { identity: '', traits: [], values: [], affirmations: [], affirmDone: {}, wheel: defaultAbout(() => '').wheel, letters: [] } });
     return s;
   }
 
@@ -238,6 +239,7 @@
     inbox: () => Store.s.tasks.filter(t => !t.date && !t.done),
     notesOn: day => Store.s.notes.filter(n => n.date === day).sort((a, b) => a.createdAt - b.createdAt),
     notesForProject: pid => Store.s.notes.filter(n => n.projectId === pid).sort((a, b) => b.createdAt - a.createdAt),
+    journalForProject: pid => Store.s.projectJournal.filter(j => j.projectId === pid).sort((a, b) => b.createdAt - a.createdAt),
     recentNotes(n) { return [...this.s.notes].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt).slice(0, n); },
     goalsFor: (h, p) => Store.s.goals.filter(x => x.horizon === h && x.period === p),
     goalsOn(day) { return ['year', 'month', 'week', 'day'].map(h => ({ h, p: D.periodOf(h, day), list: this.goalsFor(h, D.periodOf(h, day)) })); },

@@ -479,6 +479,11 @@ figcaption { margin-top: 10px; color: var(--ink-3); font-size: 13.5px; } figcapt
 .m-h .ic { color: var(--blue-500); }
 .m-link { display: flex; align-items: center; gap: 8px; color: var(--ink-3); } .m-link select { flex: 1; }
 .m-foot { display: flex; justify-content: space-between; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line-2); margin-top: 6px; flex-wrap: wrap; }
+.proj-back { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 500; color: var(--blue-600); padding: 6px 10px; margin-left: -10px; border-radius: 8px; transition: background .2s; }
+.proj-back:hover { background: var(--sky-100); }
+.proj-back .ic { width: 15px; height: 15px; }
+.proj-page { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow-sm); overflow: hidden; margin-top: 8px; }
+.view > .m-foot { margin-top: 20px; }
 .search-box { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line-2); color: var(--ink-3); position: sticky; top: 0; background: var(--panel); z-index: 1; }
 .search-box input { flex: 1; border: 0; outline: none; background: none; font-size: 17px; color: var(--ink); }
 .results { padding: 8px; display: flex; flex-direction: column; gap: 2px; }
