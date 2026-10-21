@@ -1,0 +1,11 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# local test servers, logs and backups
+*.log
+dayleaf-backup-*.json
+node_modules/
