@@ -1,7 +1,7 @@
 /* dayleaf — the bunny. One bunny on a page (plus the one in the sidebar), never in the writing view,
    and a different trick every time you click it. */
 (function (g) {
-  const { D, esc, icon } = U;
+  const { D, esc, icon, clamp } = U;
   const ui = App.ui;
   const hash = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); };
   const fmt = t => { const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
@@ -83,9 +83,45 @@
   }
 
   /* an occasional visitor: it takes the place of the page bunny while it is here */
+  const GIGGLES = ['Hehe, that tickles!', 'Tee-hee!', 'Giggle giggle!', 'You caught me!', 'Wheee, again!'];
   const V = {
-    el: null, timer: null, hideT: null,
-    init() { this.el = document.getElementById('buddy'); this.schedule(45000); },
+    el: null, timer: null, hideT: null, justDragged: false,
+    init() { this.el = document.getElementById('buddy'); this.schedule(45000); this.bindDrag(); },
+    /* pointer-drag her anywhere on screen; a real drag giggles instead of triggering a trick */
+    bindDrag() {
+      const el = this.el;
+      let sx = 0, sy = 0, ox = 0, oy = 0, moved = false, dragging = false;
+      el.addEventListener('pointerdown', ev => {
+        if (ev.button) return;
+        const r = el.getBoundingClientRect();
+        sx = ev.clientX; sy = ev.clientY; ox = r.left; oy = r.top; moved = false; dragging = true;
+        try { el.setPointerCapture(ev.pointerId); } catch (_) { /* ignore */ }
+      });
+      el.addEventListener('pointermove', ev => {
+        if (!dragging) return;
+        const dx = ev.clientX - sx, dy = ev.clientY - sy;
+        if (!moved && Math.hypot(dx, dy) > 6) { moved = true; el.classList.add('dragging'); }
+        if (!moved) return;
+        const nx = clamp(ox + dx, 4, innerWidth - el.offsetWidth - 4), ny = clamp(oy + dy, 4, innerHeight - el.offsetHeight - 4);
+        el.style.left = nx + 'px'; el.style.top = ny + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto';
+      });
+      const end = () => {
+        if (!dragging) return;
+        dragging = false;
+        if (moved) { el.classList.remove('dragging'); this.justDragged = true; this.giggle(); setTimeout(() => { this.justDragged = false; }, 50); }
+        moved = false;
+      };
+      el.addEventListener('pointerup', end);
+      el.addEventListener('pointercancel', end);
+    },
+    giggle() {
+      const body = this.el.querySelector('.mq-body'), b = this.el.querySelector('.mq-bubble');
+      if (body && body.animate) body.animate([{ transform: 'rotate(0)' }, { transform: 'rotate(-10deg)' }, { transform: 'rotate(9deg)' }, { transform: 'rotate(-7deg)' }, { transform: 'rotate(5deg)' }, { transform: 'rotate(0)' }], { duration: 650, easing: 'ease-out' });
+      burst(this.el, 'hearts', 5);
+      if (b) { b.textContent = GIGGLES[Math.floor(Math.random() * GIGGLES.length)]; if (b.animate) b.animate([{ opacity: 0 }, { opacity: 1, offset: .1 }, { opacity: 1, offset: .82 }, { opacity: 0 }], { duration: 2400 });
+        this.el.classList.add('in'); document.body.classList.add('visiting'); this.el.hidden = false; }
+      clearTimeout(this.hideT); this.hideT = setTimeout(() => this.hide(), 9000);
+    },
     schedule(ms) { clearTimeout(this.timer); this.timer = setTimeout(() => this.visit(), ms); },
     visit() {
       const s = Store.s;

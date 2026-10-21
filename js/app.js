@@ -71,7 +71,7 @@
   function closeModal() {
     if (!ui.modal || ui.closing) return;
     ui.closing = true; paint(false);
-    setTimeout(() => { ui.modal = null; ui.closing = false; ui.sec = { step: 'idle', msg: '' }; ui.restore = null; ui.restoreErr = ''; ui.sync = Object.assign({}, ui.sync, { msg: '', pullPreview: null }); ui.reset = { msg: '', ok: false }; paint(false); }, 190);
+    setTimeout(() => { ui.modal = null; ui.closing = false; ui.sec = { step: 'idle', msg: '' }; ui.restore = null; ui.restoreErr = ''; ui.sync = Object.assign({}, ui.sync, { msg: '', pullPreview: null }); paint(false); }, 190);
   }
 
   /* ---------- data helpers ---------- */
@@ -217,7 +217,7 @@
     'carry-over': el => S.set(s => { const prev = D.add(el.dataset.day, -1); s.tasks.forEach(t => { if (t.date === prev && !t.done) t.date = el.dataset.day; }); }),
 
     /* bunny */
-    'mascot-poke': el => { Mascot.poke(el); if (el.id === 'buddy') setTimeout(() => Mascot.visitor.hide(), 3200); },
+    'mascot-poke': el => { if (Mascot.visitor.justDragged) return; Mascot.poke(el); if (el.id === 'buddy') setTimeout(() => Mascot.visitor.hide(), 3200); },
     'banner-add': el => { ui.bannerH = el.dataset.h; bannerFile.click(); },
     'banner-del': el => S.set(s => { const h = el.dataset.h; if (h.startsWith('life:')) { const g = s.goals.find(x => x.id === h.slice(5)); if (g) g.img = ''; } else s.banners[h] = ''; }),
 
@@ -519,17 +519,6 @@
       catch (e) { ui.sync = Object.assign({}, ui.sync, { msg: e.message || 'Something went wrong.', ok: false }); }
       el.disabled = false; refresh();
     },
-    'resetpw-save': async el => {
-      const row = el.closest('[data-row-sync]'), v = f => (row.querySelector(`[data-f="${f}"]`) || {}).value || '';
-      const pw = v('pw');
-      if (pw !== v('pwConf')) { ui.reset = { msg: 'The two passwords don’t match.', ok: false }; return refresh(); }
-      el.disabled = true;
-      try {
-        await Sync.completeReset(pw);
-        ui.reset = { msg: '', ok: false }; toast('Password updated — you’re signed in.');
-        openModal({ type: 'profile' });
-      } catch (e) { el.disabled = false; ui.reset = { msg: e.message || 'Something went wrong.', ok: false }; refresh(); }
-    },
 
     'cal-prev': () => { const c = ui.cal; ui.cal = c.m === 0 ? { y: c.y - 1, m: 11 } : { y: c.y, m: c.m - 1 }; refresh(); },
     'cal-next': () => { const c = ui.cal; ui.cal = c.m === 11 ? { y: c.y + 1, m: 0 } : { y: c.y, m: c.m + 1 }; refresh(); },
@@ -705,10 +694,10 @@
     ui.photoIdx = 0;
     if (!location.hash) history.replaceState(null, '', '#/dashboard');
     first = true; go();
-    if (Sync.pendingRecovery) openModal({ type: 'resetpw' });
   }
-  Security.run((data, newPin) => {
+  Security.run((data, newPin, name) => {
     S.load(data);
+    if (name) S.set(s => { s.user.name = name; });
     if (newPin) Security.enable(newPin).catch(() => toast('Could not set the PIN')).then(start);
     else start();
   });

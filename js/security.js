@@ -69,11 +69,12 @@
 
   /* ---------- lock screen ---------- */
   const el = () => document.getElementById('lock');
-  const L = { active: false, mode: 'unlock', pin: '', first: '', msg: '', shake: false, busy: false, armed: false, tick: null, cloud: { tab: 'signin', msg: '', busy: false } };
+  const L = { active: false, mode: 'unlock', pin: '', first: '', msg: '', shake: false, busy: false, armed: false, tick: null, cloud: { tab: 'signin', msg: '', busy: false }, forgotFlow: false, cloudData: null, pending: null };
   let ready = null, idleT = null, hiddenAt = 0;
 
   const lockedFor = () => { const m = meta(); return m && m.until && m.until > Date.now() ? Math.ceil((m.until - Date.now()) / 1000) : 0; };
   const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const pwFieldLock = (f, ph, auto) => `<div class="pw-field"><input type="password" class="lk-input" ${auto ? `autocomplete="${auto}"` : ''} placeholder="${ph}" data-lkf="${f}" aria-label="${ph}"><button type="button" class="icon-btn sm pw-eye" data-pw-toggle tabindex="-1" aria-label="Show password">${icon('eye')}</button></div>`;
 
   function lockHTML() {
     const m = meta() || {}, wait = L.mode === 'unlock' ? lockedFor() : 0;
@@ -81,29 +82,57 @@
       unlock: ['Welcome back', 'Enter your PIN to open dayleaf'],
       setup1: ['Create a PIN', 'Choose 4–6 digits. Your data is encrypted with it, so keep it somewhere safe.'],
       setup2: ['Confirm your PIN', 'Enter the same digits once more.'],
-      forgot: ['Forgot your PIN?', 'Your data is encrypted with your PIN, so it can’t be recovered without it. You can erase everything and start fresh.'],
     }[L.mode];
-    const slots = L.mode === 'unlock' ? (m.len || 4) : L.mode === 'setup2' ? L.first.length : 6;
-    const dots = Array.from({ length: slots }, (_, i) => `<i class="${i < L.pin.length ? 'on' : ''}"></i>`).join('');
-    const pad = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(d => `<button data-k="${d}" ${wait ? 'disabled' : ''}>${d}</button>`).join('') +
-      `<span class="blank"></span><button data-k="0" ${wait ? 'disabled' : ''}>0</button><button data-back aria-label="Delete" ${L.pin ? '' : 'disabled'}>⌫</button>`;
+    if (L.mode === 'welcome') {
+      const hasPin = !!meta();
+      return `<div class="lock-card">
+        <img class="lk-bunny" src="assets/mascot.png" alt="" draggable="false">
+        <span class="lk-logo">${icon('sparkles')}</span>
+        <h2>Welcome to dayleaf</h2><p class="lk-sub">A calm space for your days.</p>
+        <button class="btn primary lk-go lk-start" data-lk="welcome-start" ${hasPin ? '' : 'disabled'}>Start</button>
+        <div class="lk-split"><button class="btn lk-signin" data-lk="welcome-signin">Sign in</button><button class="btn lk-signup" data-lk="welcome-signup">Sign up</button></div>
+      </div>`;
+    }
     if (L.mode === 'forgot') {
-      return `<div class="lock-card"><span class="lk-logo">${icon('shield')}</span><h2>${titles[0]}</h2><p class="lk-sub">${titles[1]}</p>
+      return `<div class="lock-card"><span class="lk-logo">${icon('shield')}</span><h2>Forgot your PIN?</h2>
+        <p class="lk-sub">If you have a dayleaf account, sign in to recover your data and set a new PIN. Otherwise, you can erase everything and start fresh — a forgotten PIN can’t be recovered.</p>
+        <button class="btn primary lk-go" data-lk="forgot-signin">${icon('cloud')}Sign in to recover</button>
         <div class="lk-actions"><button class="btn" data-lk="back">Back</button><button class="btn danger${L.armed ? ' armed' : ''}" data-lk="erase">${L.armed ? 'Tap again to erase everything' : 'Erase everything'}</button></div></div>`;
     }
     if (L.mode === 'cloud') {
       const c = L.cloud;
       return `<div class="lock-card">
         <span class="lk-logo">${icon('cloud')}</span>
-        <h2>Sign in to sync</h2><p class="lk-sub">${c.tab === 'signup' ? 'Create an account to sync your data across devices.' : 'Sign in to pull your data down to this device.'}</p>
+        <h2>${c.tab === 'signup' ? 'Create your account' : 'Sign in to sync'}</h2><p class="lk-sub">${c.tab === 'signup' ? 'Create an account to sync your data across devices.' : 'Sign in to pull your data down to this device.'}</p>
         <div class="seg lk-seg"><button class="${c.tab === 'signin' ? 'on' : ''}" data-lkc="tab" data-v="signin" ${c.busy ? 'disabled' : ''}>Sign in</button><button class="${c.tab === 'signup' ? 'on' : ''}" data-lkc="tab" data-v="signup" ${c.busy ? 'disabled' : ''}>Sign up</button></div>
         <div class="lk-form">
           <input type="email" class="lk-input" autocomplete="email" placeholder="Email" data-lkf="email" aria-label="Email" ${c.busy ? 'disabled' : ''}>
-          <div class="pw-field"><input type="password" class="lk-input" autocomplete="${c.tab === 'signup' ? 'new-password' : 'current-password'}" placeholder="Password" data-lkf="pw" aria-label="Password" ${c.busy ? 'disabled' : ''}><button type="button" class="icon-btn sm pw-eye" data-pw-toggle tabindex="-1" aria-label="Show password">${icon('eye')}</button></div>
+          ${pwFieldLock('pw', 'Password', c.tab === 'signup' ? 'new-password' : 'current-password')}
         </div>
         <p class="lk-msg${c.msg ? ' show' : ''}">${esc(c.msg)}</p>
         <button class="btn primary lk-go" data-lk="cloud-submit" ${c.busy ? 'disabled' : ''}>${c.tab === 'signup' ? 'Create account' : 'Sign in'}</button>
-        <button class="lk-link" data-lk="cloud-back">Back</button>
+        <div class="lk-foot">${c.tab === 'signin' ? `<button class="lk-link" data-lk="cloud-reset">Forgot password?</button>` : ''}<button class="lk-link" data-lk="cloud-back">Back</button></div>
+      </div>`;
+    }
+    if (L.mode === 'cloud-reset') {
+      const c = L.cloud;
+      return `<div class="lock-card">
+        <span class="lk-logo">${icon('cloud')}</span>
+        <h2>Reset your password</h2><p class="lk-sub">Enter your account email and we’ll send a link to reset your password.</p>
+        <div class="lk-form"><input type="email" class="lk-input" autocomplete="email" placeholder="Email" data-lkf="email" aria-label="Email" ${c.busy ? 'disabled' : ''}></div>
+        <p class="lk-msg${c.msg ? ' show' : ''}">${esc(c.msg)}</p>
+        <button class="btn primary lk-go" data-lk="cloud-reset-submit" ${c.busy ? 'disabled' : ''}>Send reset link</button>
+        <button class="lk-link" data-lk="cloud">Back to sign in</button>
+      </div>`;
+    }
+    if (L.mode === 'reset-password') {
+      const c = L.cloud;
+      return `<div class="lock-card">
+        <span class="lk-logo">${icon('lock')}</span>
+        <h2>Set a new password</h2><p class="lk-sub">Choose a new password for your dayleaf account.</p>
+        <div class="lk-form">${pwFieldLock('pw', 'New password', 'new-password')}${pwFieldLock('pwConf', 'Confirm new password', 'new-password')}</div>
+        <p class="lk-msg${c.msg ? ' show' : ''}">${esc(c.msg)}</p>
+        <button class="btn primary lk-go" data-lk="reset-password-submit" ${c.busy ? 'disabled' : ''}>Save password</button>
       </div>`;
     }
     if (L.mode === 'cloud-pass') {
@@ -111,14 +140,26 @@
       return `<div class="lock-card">
         <span class="lk-logo">${icon('cloud')}</span>
         <h2>Enter your sync passphrase</h2><p class="lk-sub">Your cloud data is encrypted. Enter the passphrase you set on your other device to unlock it here.</p>
-        <div class="lk-form">
-          <div class="pw-field"><input type="password" class="lk-input" placeholder="Sync passphrase" data-lkf="pass" aria-label="Sync passphrase" ${c.busy ? 'disabled' : ''}><button type="button" class="icon-btn sm pw-eye" data-pw-toggle tabindex="-1" aria-label="Show password">${icon('eye')}</button></div>
-        </div>
+        <div class="lk-form">${pwFieldLock('pass', 'Sync passphrase')}</div>
         <p class="lk-msg${c.msg ? ' show' : ''}">${esc(c.msg)}</p>
         <button class="btn primary lk-go" data-lk="cloud-pass-submit" ${c.busy ? 'disabled' : ''}>Unlock</button>
         <button class="lk-link" data-lk="cloud">Use a different account</button>
       </div>`;
     }
+    if (L.mode === 'name') {
+      return `<div class="lock-card">
+        <img class="lk-bunny" src="assets/mascot.png" alt="" draggable="false">
+        <span class="lk-logo">${icon('heart')}</span>
+        <h2>What should we call you?</h2><p class="lk-sub">We’ll use this to greet you around dayleaf.</p>
+        <div class="lk-form"><input type="text" class="lk-input" placeholder="Your name" data-lkf="name" aria-label="Your name" maxlength="40" autocomplete="given-name"></div>
+        <button class="btn primary lk-go" data-lk="name-submit">Continue</button>
+        <button class="lk-link" data-lk="name-skip">Skip for now</button>
+      </div>`;
+    }
+    const slots = L.mode === 'unlock' ? (m.len || 4) : L.mode === 'setup2' ? L.first.length : 6;
+    const dots = Array.from({ length: slots }, (_, i) => `<i class="${i < L.pin.length ? 'on' : ''}"></i>`).join('');
+    const pad = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(d => `<button data-k="${d}" ${wait ? 'disabled' : ''}>${d}</button>`).join('') +
+      `<span class="blank"></span><button data-k="0" ${wait ? 'disabled' : ''}>0</button><button data-back aria-label="Delete" ${L.pin ? '' : 'disabled'}>⌫</button>`;
     return `<div class="lock-card">
       <img class="lk-bunny" src="assets/mascot.png" alt="" draggable="false">
       <span class="lk-logo">${icon(L.mode === 'unlock' ? 'lock' : 'shield')}</span>
@@ -126,7 +167,7 @@
       <div class="lk-dots${L.shake ? ' shake' : ''}${L.busy ? ' busy' : ''}">${dots}</div>
       <p class="lk-msg${wait || L.msg ? ' show' : ''}">${wait ? `Too many attempts. Try again in ${fmt(wait)}` : L.msg}</p>
       <div class="lk-pad">${pad}</div>
-      ${L.mode === 'setup1' ? `<button class="btn primary lk-go" data-lk="next" ${L.pin.length >= 4 ? '' : 'disabled'}>Continue</button><button class="lk-link" data-lk="skip">Not now</button><button class="lk-link" data-lk="cloud">Sign in to sync instead</button>` : ''}
+      ${L.mode === 'setup1' ? `<button class="btn primary lk-go" data-lk="next" ${L.pin.length >= 4 ? '' : 'disabled'}>Continue</button><button class="lk-link" data-lk="skip">Not now</button>` : ''}
       ${L.mode === 'setup2' ? `<button class="lk-link" data-lk="restart">Start over</button>` : ''}
       ${L.mode === 'unlock' ? `<button class="lk-link" data-lk="forgot">Forgot PIN?</button>` : ''}
     </div>`;
@@ -177,34 +218,57 @@
   function back() { if (!L.busy) { L.pin = L.pin.slice(0, -1); paintLock(); } }
   function confirmSetup() {
     if (L.pin !== L.first) { L.mode = 'setup1'; L.first = ''; return shake('PINs didn’t match. Try again.'); }
-    const pin = L.pin; L.pin = ''; hideLock();
-    ready(localStorage.getItem(PLAIN), pin);
+    const pin = L.pin; L.pin = '';
+    goToName(L.cloudData, pin);
   }
   function lkAction(a) {
     if (a === 'next' && L.pin.length >= 4) { L.first = L.pin; L.pin = ''; L.mode = 'setup2'; paintLock(); }
     if (a === 'restart') { L.mode = 'setup1'; L.first = ''; L.pin = ''; paintLock(); }
-    if (a === 'skip') { setMeta({ mode: 'none', autoLock: 5 }); hideLock(); ready(localStorage.getItem(PLAIN), null); }
+    if (a === 'skip') { setMeta({ mode: 'none', autoLock: 5 }); goToName(L.cloudData, null); }
     if (a === 'forgot') { L.mode = 'forgot'; L.armed = false; paintLock(); }
     if (a === 'back') { L.mode = 'unlock'; L.pin = ''; paintLock(); }
     if (a === 'erase') {
       if (!L.armed) { L.armed = true; paintLock(); setTimeout(() => { L.armed = false; if (L.mode === 'forgot') paintLock(); }, 3500); return; }
       localStorage.removeItem(VAULT); localStorage.removeItem(PLAIN); localStorage.removeItem(META);
-      key = null; L.mode = 'setup1'; L.first = ''; L.pin = ''; L.armed = false; paintLock();
+      key = null; L.mode = 'welcome'; L.first = ''; L.pin = ''; L.armed = false; paintLock();
     }
+    if (a === 'welcome-start') {
+      const m = meta();
+      if (m && m.mode === 'none') { document.body.classList.remove('locked'); hideLock(); ready(localStorage.getItem(PLAIN), null); }
+      else if (m) { L.mode = 'unlock'; L.pin = ''; paintLock(); }
+    }
+    if (a === 'welcome-signin') { L.forgotFlow = false; L.mode = 'cloud'; L.cloud = { tab: 'signin', msg: '', busy: false }; paintLock(); }
+    if (a === 'welcome-signup') { L.forgotFlow = false; L.mode = 'cloud'; L.cloud = { tab: 'signup', msg: '', busy: false }; paintLock(); }
+    if (a === 'forgot-signin') { L.forgotFlow = true; L.mode = 'cloud'; L.cloud = { tab: 'signin', msg: '', busy: false }; paintLock(); }
     if (a === 'cloud') { L.mode = 'cloud'; L.cloud = { tab: 'signin', msg: '', busy: false }; paintLock(); }
-    if (a === 'cloud-back') { L.mode = 'setup1'; L.pin = ''; paintLock(); }
+    if (a === 'cloud-back') { L.mode = L.forgotFlow ? 'forgot' : 'welcome'; L.forgotFlow = false; L.pin = ''; paintLock(); }
+    if (a === 'cloud-reset') { L.mode = 'cloud-reset'; L.cloud = Object.assign({}, L.cloud, { msg: '', busy: false }); paintLock(); }
+    if (a === 'cloud-reset-submit') cloudResetSubmit();
     if (a === 'cloud-submit') cloudSubmit();
     if (a === 'cloud-pass-submit') cloudPassSubmit();
+    if (a === 'reset-password-submit') resetPasswordSubmit();
+    if (a === 'name-submit') finishWithName((el().querySelector('[data-lkf="name"]') || {}).value || '');
+    if (a === 'name-skip') finishWithName('');
   }
   function cloudTab(v) { L.cloud = Object.assign({}, L.cloud, { tab: v, msg: '' }); paintLock(); }
 
-  /* a fresh sign-in may already have data waiting in the cloud — skip local PIN setup and load it */
+  /* a brand-new account (just finished PIN setup, or skipped it) pauses here to ask a name
+     before entering the app; a returning account with real data skips straight in */
+  function goToName(data, pin) { L.pending = { data, pin }; L.mode = 'name'; paintLock(); }
+  function finishWithName(name) {
+    const { data, pin } = L.pending || {};
+    L.pending = null; hideLock(); ready(data, pin, (name || '').trim());
+  }
+
+  /* after a successful sign-in/sign-up: data already in the cloud loads straight in (unless we're
+     here to recover a forgotten PIN, in which case we still set a fresh one); no data yet routes
+     through PIN setup same as a brand-new account */
   async function afterCloudAuth() {
     if (g.Sync.needsPassphrase) { L.mode = 'cloud-pass'; L.cloud = Object.assign({}, L.cloud, { busy: false, msg: '' }); paintLock(); return; }
     try {
       const p = await g.Sync.preview();
-      setMeta({ mode: 'none', autoLock: 5 });
-      hideLock(); ready(p ? JSON.stringify(p.data) : null, null);
+      if (p && !L.forgotFlow) { setMeta({ mode: 'none', autoLock: 5 }); hideLock(); ready(JSON.stringify(p.data), null); }
+      else { L.cloudData = p ? JSON.stringify(p.data) : null; L.mode = 'setup1'; L.first = ''; L.pin = ''; paintLock(); }
     } catch (e) {
       if (e.code === 'passphrase-needed') { L.mode = 'cloud-pass'; L.cloud = Object.assign({}, L.cloud, { busy: false, msg: '' }); paintLock(); }
       else { L.cloud = Object.assign({}, L.cloud, { busy: false, msg: e.message || 'Something went wrong.' }); paintLock(); }
@@ -224,6 +288,28 @@
       await afterCloudAuth();
     } catch (e) { L.cloud = Object.assign({}, L.cloud, { busy: false, msg: e.message || 'Something went wrong.' }); paintLock(); }
   }
+  async function cloudResetSubmit() {
+    if (L.cloud.busy) return;
+    const email = (el().querySelector('[data-lkf="email"]') || {}).value || '';
+    if (!email) { L.cloud = Object.assign({}, L.cloud, { msg: 'Enter your email.' }); return paintLock(); }
+    L.cloud = Object.assign({}, L.cloud, { busy: true, msg: '' }); paintLock();
+    try {
+      await g.Sync.requestReset(email);
+      L.cloud = Object.assign({}, L.cloud, { busy: false, msg: 'If that email has an account, a reset link is on its way.' }); paintLock();
+    } catch (e) { L.cloud = Object.assign({}, L.cloud, { busy: false, msg: e.message || 'Something went wrong.' }); paintLock(); }
+  }
+  async function resetPasswordSubmit() {
+    if (L.cloud.busy) return;
+    const card = el().querySelector('.lock-card');
+    const pw = (card.querySelector('[data-lkf="pw"]') || {}).value || '', pw2 = (card.querySelector('[data-lkf="pwConf"]') || {}).value || '';
+    if (pw !== pw2) { L.cloud = Object.assign({}, L.cloud, { msg: 'The two passwords don’t match.' }); return paintLock(); }
+    L.cloud = Object.assign({}, L.cloud, { busy: true, msg: '' }); paintLock();
+    try {
+      await g.Sync.completeReset(pw);
+      L.forgotFlow = true;
+      await afterCloudAuth();
+    } catch (e) { L.cloud = Object.assign({}, L.cloud, { busy: false, msg: e.message || 'Something went wrong.' }); paintLock(); }
+  }
   async function cloudPassSubmit() {
     if (L.cloud.busy) return;
     const pass = (el().querySelector('[data-lkf="pass"]') || {}).value || '';
@@ -232,8 +318,8 @@
     try {
       await g.Sync.setPassphrase(pass);
       const p = await g.Sync.preview();
-      setMeta({ mode: 'none', autoLock: 5 });
-      hideLock(); ready(p ? JSON.stringify(p.data) : null, null);
+      if (p && !L.forgotFlow) { setMeta({ mode: 'none', autoLock: 5 }); hideLock(); ready(JSON.stringify(p.data), null); }
+      else { L.cloudData = p ? JSON.stringify(p.data) : null; L.mode = 'setup1'; L.first = ''; L.pin = ''; paintLock(); }
     } catch (e) {
       g.Sync.forgetPassphrase(); g.Sync.needsPassphrase = true;
       L.cloud = Object.assign({}, L.cloud, { busy: false, msg: e.message || 'Could not unlock.' }); paintLock();
@@ -256,8 +342,9 @@
 
     run(cb) {
       ready = cb;
+      if (g.Sync && g.Sync.pendingRecovery) { L.mode = 'reset-password'; L.cloud = { msg: '', busy: false }; showLock(); return; }
       const m = meta();
-      if (!m) { L.mode = 'setup1'; L.first = ''; showLock(); }
+      if (!m) { L.mode = 'welcome'; showLock(); }
       else if (m.mode === 'none') { document.body.classList.remove('locked'); cb(localStorage.getItem(PLAIN), null); }
       else { L.mode = 'unlock'; showLock(); }
     },
@@ -304,13 +391,14 @@
       if (k) press(k.dataset.k); else if (b) back(); else if (a) lkAction(a.dataset.lk); else if (t) cloudTab(t.dataset.v);
     });
   });
+  const ENTER_SUBMIT = { cloud: 'cloud-submit', 'cloud-pass': 'cloud-pass-submit', name: 'name-submit', 'cloud-reset': 'cloud-reset-submit', 'reset-password': 'reset-password-submit' };
   document.addEventListener('keydown', ev => {
     if (!L.active) return;
-    if (L.mode === 'cloud' || L.mode === 'cloud-pass') {
-      if (ev.key === 'Enter') { ev.preventDefault(); lkAction(L.mode === 'cloud' ? 'cloud-submit' : 'cloud-pass-submit'); }
+    if (ENTER_SUBMIT[L.mode]) {
+      if (ev.key === 'Enter') { ev.preventDefault(); lkAction(ENTER_SUBMIT[L.mode]); }
       return;
     }
-    if (L.mode === 'forgot') return;
+    if (L.mode === 'forgot' || L.mode === 'welcome') return;
     if (/^\d$/.test(ev.key)) { ev.preventDefault(); press(ev.key); }
     else if (ev.key === 'Backspace') { ev.preventDefault(); back(); }
     else if (ev.key === 'Enter') { ev.preventDefault(); if (L.mode === 'unlock') submitUnlock(); else if (L.mode === 'setup1') lkAction('next'); }

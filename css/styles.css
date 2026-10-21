@@ -455,7 +455,6 @@ figcaption { margin-top: 10px; color: var(--ink-3); font-size: 13.5px; } figcapt
 .modal { width: min(680px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; border-radius: 22px; background: var(--panel); box-shadow: 0 40px 80px -30px rgba(36, 50, 64, .55); animation: pop .32s var(--ease) both; }
 .m-search { width: min(620px, 100%); max-height: 70vh; }
 .m-profile, .m-habits { width: min(520px, 100%); }
-.m-resetpw { width: min(420px, 100%); }
 .m-cover { position: relative; height: 130px; background: var(--cv); color: var(--cvi); overflow: hidden; border-radius: 22px 22px 0 0; }
 .m-cover::before { content: ''; position: absolute; width: 260px; height: 260px; border-radius: 50%; right: -60px; top: -120px; background: rgba(255, 255, 255, .28); }
 .m-cover .pc-icon { right: 64px; top: 20px; } .m-cover .pc-icon .ic { width: 44px; height: 44px; }
@@ -571,6 +570,14 @@ body.locked #app, body.locked #modal-root, body.locked #toast-root { display: no
 .lk-input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px; outline: none; background: var(--panel); text-align: left; transition: border-color .2s, box-shadow .2s; }
 .lk-input:focus { border-color: var(--blue-400); box-shadow: 0 0 0 3px var(--sky-100); }
 .lk-form .pw-field input { padding-right: 40px; }
+.lk-start { margin-top: 24px; font-size: 16px; padding: 15px; }
+.lk-split { width: 100%; display: flex; gap: 8px; margin-top: 8px; }
+.lk-split .btn { flex: 1; padding: 10px; font-size: 13.5px; }
+.lk-signin { background: var(--sky-200); color: var(--blue-800); }
+.lk-signin:hover { background: var(--sky-300); }
+.lk-signup { background: var(--cream-300); color: var(--blue-800); }
+.lk-signup:hover { background: var(--cream-400); }
+.lk-foot { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px; }
 
 /* ---------- photo widget ---------- */
 .photo-card { padding: 0; overflow: hidden; display: flex; flex-direction: column; min-height: 340px; }
@@ -1038,6 +1045,9 @@ h1, h2, h3, h4, .m-h, .section-title h2, .card-head h2 { text-transform: capital
 #buddy.in .mq-bubble { opacity: 1; transform: translate(0, -6px) scale(1); }
 #buddy .mq-bubble::after { left: auto; right: 22px; }
 #buddy .mq-shadow { display: none; }
+#buddy { touch-action: none; cursor: grab; }
+#buddy.dragging { cursor: grabbing; transition: none; z-index: 80; }
+#buddy.dragging .mq-body { animation: none; transform: scale(1.06); transition: transform .15s var(--ease); }
 .mq-heart { position: fixed; z-index: 200; width: 17px; height: 17px; margin: -8px 0 0 -8px; pointer-events: none; color: #8FB4CF; opacity: 0; }
 .mq-heart .ic { width: 100%; height: 100%; fill: currentColor; stroke: currentColor; stroke-width: 1; }
 .page-head.dash-head { align-items: flex-end; }

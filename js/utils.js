@@ -314,7 +314,6 @@
       restore: null, bannerH: 'all', moreColors: false, journalQ: '', journalSort: 'new', jOpen: {}, notesQ: '', notesSort: 'new', mascotSeed: 0,
       sec: { step: 'idle', msg: '' },
       sync: { mode: 'signin', msg: '', ok: false, pullPreview: null },
-      reset: { msg: '', ok: false },
     },
   };
 })(window);

@@ -341,19 +341,4 @@
       <div class="m-foot"><button class="btn ghost" data-act="reset-demo">${icon('refresh')}Reload sample data</button><button class="btn ghost danger" data-act="wipe-all">${icon('trash')}Start empty</button></div>
     </div>`;
   };
-
-  /* ---------- finish a password reset after the email link lands back here ---------- */
-  V.modals.resetpw = () => {
-    const r = ui.reset;
-    return `<div class="m-head"><span class="eyebrow">Reset password</span>${closeBtn}</div>
-    <div class="m-body">
-      <p class="muted">Choose a new password for your dayleaf account.</p>
-      <div class="sec-form text" data-row-sync>
-        ${pwField('pw', 'New password', 'new-password')}
-        ${pwField('pwConf', 'Confirm new password', 'new-password')}
-        <div class="sec-btns"><button class="btn primary sm" data-act="resetpw-save">Save new password</button></div>
-      </div>
-      <p class="sec-msg${r.msg ? ' show' : ''} ${r.ok ? 'ok' : ''}" role="status">${esc(r.msg || '')}</p>
-    </div>`;
-  };
 })(window);
