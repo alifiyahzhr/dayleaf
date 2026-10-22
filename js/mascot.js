@@ -102,7 +102,9 @@
         const dx = ev.clientX - sx, dy = ev.clientY - sy;
         if (!moved && Math.hypot(dx, dy) > 6) { moved = true; el.classList.add('dragging'); }
         if (!moved) return;
-        const nx = clamp(ox + dx, 4, innerWidth - el.offsetWidth - 4), ny = clamp(oy + dy, 4, innerHeight - el.offsetHeight - 4);
+        // keep clear of the topbar (hamburger/search), the only way to open nav on mobile
+        const topbar = document.querySelector('.topbar'), minY = (topbar ? topbar.offsetHeight : 0) + 8;
+        const nx = clamp(ox + dx, 4, innerWidth - el.offsetWidth - 4), ny = clamp(oy + dy, minY, innerHeight - el.offsetHeight - 4);
         el.style.left = nx + 'px'; el.style.top = ny + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto';
       });
       const end = () => {

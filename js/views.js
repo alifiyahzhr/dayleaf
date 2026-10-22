@@ -30,12 +30,14 @@
 
   /* ---------- shared building blocks ---------- */
   function taskRow(t, o = {}) {
-    const p = t.projectId && S.project(t.projectId), gl = t.goalId && S.goal(t.goalId);
+    const p = t.projectId && S.project(t.projectId), gl = t.goalId && S.goal(t.goalId), co = t.courseId && S.course(t.courseId), da = t.dapukanId && S.dapukan(t.dapukanId);
     return `<div class="task${t.done ? ' done' : ''}" data-key="${t.id}">
       <button class="check${t.done ? ' on' : ''}" data-act="task-toggle" data-id="${t.id}" role="checkbox" aria-checked="${!!t.done}" aria-label="Mark ${esc(t.title)} done">${icon('check')}</button>
       ${o.edit ? `<input class="task-title" value="${esc(t.title)}" data-input="task-title" data-id="${t.id}" aria-label="Task">` : `<span class="task-title">${esc(t.title)}</span>`}
       <span class="tags">
         ${p && !o.noProject ? `<button class="chip proj ${p.cover}" data-act="project-open" data-id="${p.id}">${esc(p.title)}</button>` : ''}
+        ${co && !o.noCourse ? `<button class="chip proj ${co.color}" data-act="course-open" data-id="${co.id}">${esc(co.name)}</button>` : ''}
+        ${da && !o.noDapukan ? `<button class="chip proj ${da.color}" data-act="dapukan-open" data-id="${da.id}">${esc(da.role)}</button>` : ''}
         ${gl && !o.noGoal ? `<button class="chip gchip" data-act="goal-open" data-id="${gl.id}">${icon('flag')}${esc(gl.title)}</button>` : ''}
         ${o.date && t.date ? `<a class="chip date" href="#/daily/${t.date}">${D.short(t.date)}</a>` : ''}
       </span>
@@ -583,6 +585,8 @@
         ${nav('calendar', '#/calendar', 'calendar', 'Calendar')}
         ${nav('habits', '#/habits', 'activity', 'Habit Tracker')}
         ${nav('projects', '#/projects', 'folder', 'Personal Projects')}
+        ${nav('school', '#/school', 'graduation', 'School')}
+        ${nav('dapukan', '#/dapukan', 'layers', 'Dapukan')}
         ${nav('goals', '#/goals', 'flag', 'Future Goals')}
         ${nav('about', '#/about', 'heart', 'About Me')}
       </nav>
@@ -598,8 +602,11 @@
       <button class="icon-btn lock-btn" data-act="lock-now" aria-label="Lock dayleaf" title="${Security.enabled() ? 'Lock now' : 'Set a PIN'}">${icon('lock')}</button></div>`;
   };
 
-  const CRUMB = { dashboard: 'Dashboard', daily: 'Daily Entry', journal: 'Journal', notes: 'Notes', calendar: 'Calendar', habits: 'Habit Tracker', projects: 'Personal Projects', goals: 'Future Goals', about: 'About Me' };
-  const crumbFor = r => r.name === 'project' ? ((S.project(r.params.id) || {}).title || 'Project') : CRUMB[r.name];
+  const CRUMB = { dashboard: 'Dashboard', daily: 'Daily Entry', journal: 'Journal', notes: 'Notes', calendar: 'Calendar', habits: 'Habit Tracker', projects: 'Personal Projects', goals: 'Future Goals', about: 'About Me', school: 'School', dapukan: 'Dapukan' };
+  const crumbFor = r => r.name === 'project' ? ((S.project(r.params.id) || {}).title || 'Project')
+    : r.name === 'course' ? ((S.course(r.params.id) || {}).name || 'Course')
+    : r.name === 'role' ? ((S.dapukan(r.params.id) || {}).role || 'Role')
+    : CRUMB[r.name];
   V.title = () => crumbFor(App.route);
   V.topbar = () => `<button class="icon-btn menu-btn" data-act="nav-open" aria-label="Open menu">${icon('menu')}</button>
     <nav class="crumbs" aria-label="Breadcrumb"><span>My workspace</span><i>/</i><b>${esc(crumbFor(App.route))}</b></nav>
@@ -607,12 +614,35 @@
     <button class="icon-btn" data-act="search-open" aria-label="Search">${icon('search')}</button></div>`;
 
   /* ---------- project (full page) ---------- */
+  const SEC_TITLE = { tasks: 'Tasks', journal: 'Journal', notes: 'Notes', goals: 'Linked goals' };
   V.project = r => {
     const id = r.params.id, p = S.project(id);
     if (!p) return `<a class="proj-back" href="#/projects">${icon('chevL')}All projects</a>${empty('This project no longer exists.')}`;
     const st = S.projectStats(p), ts = S.s.tasks.filter(x => x.projectId === id);
     const linked = S.s.goals.filter(x => x.projectId === id), free = S.s.goals.filter(x => x.projectId !== id && x.horizon !== 'day');
     const journal = S.journalForProject(id);
+    const secCard = (key, body) => `<section class="card sec-card" draggable="true" data-sec="${key}" data-list="projects" data-id="${id}">
+      <header class="card-head"><span class="sec-grip" title="Drag to reorder">${icon('grip')}</span><h2>${SEC_TITLE[key]}</h2></header>${body}</section>`;
+    const SEC_HTML = {
+      tasks: `<p class="muted">Tasks with a date also appear in that day’s daily entry.</p>
+        <div class="task-list">${ts.map(x => taskRow(x, { edit: true, noProject: true, date: true })).join('') || empty('No tasks yet.')}</div>
+        <div class="add-row" data-row><span class="add-ic">${icon('plus')}</span><input class="grow" data-f="title" placeholder="Add a task" data-enter="task-add" data-project="${id}" aria-label="New task"><input type="date" data-f="date" aria-label="Date (optional)"><button class="btn sm primary" data-act="task-add">Add</button></div>`,
+      journal: `<p class="muted">Longer, reflective entries about this project — opens in its own window, separate from your quick notes below.</p>
+        <div class="jrow-list">${journal.map(j => `<button class="jrow" data-act="pjournal-open" data-id="${j.id}">
+          <span class="jrow-main"><b>${esc(j.title || 'Untitled entry')}</b><small>${esc((j.body || '').slice(0, 90) || 'No written entry')}</small></span>
+          <span class="jrow-date">${D.short(new Date(j.createdAt).toISOString().slice(0, 10))}</span>${icon('chevR')}</button>`).join('') || empty('No journal entries yet. Write a longer reflection whenever you like.')}</div>
+        <button class="btn sm" data-act="pjournal-add" data-project="${id}">${icon('plus')}New journal entry</button>`,
+      notes: `<p class="muted">Quick notes — also appear in that day’s daily entry.</p>
+        <div class="notes">${S.notesForProject(id).map(n => `<article class="note" data-key="${n.id}">
+          <div class="note-top"><span>${n.createdAt > 1e12 ? new Date(n.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Note'}</span><button class="icon-btn sm ghost" data-act="note-del" data-id="${n.id}" aria-label="Delete note">${icon('trash')}</button></div>
+          <input class="note-title" value="${esc(n.title)}" placeholder="Title" data-input="note-title" data-id="${n.id}" aria-label="Note title">
+          <textarea class="note-body" rows="3" placeholder="Write something…" data-input="note-body" data-id="${n.id}" aria-label="Note">\n${esc(n.body)}</textarea></article>`).join('') || empty('No notes yet. Jot down ideas, references or anything else for this project.')}</div>
+        <button class="btn sm" data-act="note-add" data-project="${id}">${icon('plus')}New note</button>`,
+      goals: `<div class="goal-list">${linked.map(x => goalRow(x, { noParent: true })).join('') || empty('Not linked to a goal yet.')}</div>
+        ${free.length ? `<label class="m-link">${icon('link')}<select data-change="project-link-goal" data-id="${id}"><option value="">Link to a goal…</option>${free.map(x => opt(x.id, `${HNAME[x.horizon]} · ${x.title}`)).join('')}</select></label>` : ''}`,
+    };
+    const order = (p.sections || U.PROJECT_SECTIONS).slice();
+    U.PROJECT_SECTIONS.forEach(k => { if (!order.includes(k)) order.push(k); });
     return `
     <a class="proj-back" href="#/projects">${icon('chevL')}All projects</a>
     <div class="proj-page">
@@ -631,25 +661,21 @@
         <div class="m-progress"><div><b>${pct(st.pct)}%</b><small>${st.done} of ${st.total} tasks done</small></div>${bar(st.pct)}</div>
       </div>
     </div>
-    ${card('', 'Tasks', '', `<p class="muted">Tasks with a date also appear in that day’s daily entry.</p>
-      <div class="task-list">${ts.map(x => taskRow(x, { edit: true, noProject: true, date: true })).join('') || empty('No tasks yet.')}</div>
-      <div class="add-row" data-row><span class="add-ic">${icon('plus')}</span><input class="grow" data-f="title" placeholder="Add a task" data-enter="task-add" data-project="${id}" aria-label="New task"><input type="date" data-f="date" aria-label="Date (optional)"><button class="btn sm primary" data-act="task-add">Add</button></div>`)}
-    ${card('', 'Journal', '', `<p class="muted">Longer, reflective entries about this project — optional, separate from your quick notes below.</p>
-      <div class="notes">${journal.map(j => `<article class="note" data-key="${j.id}">
-        <div class="note-top"><span>${D.long(new Date(j.createdAt).toISOString().slice(0, 10))}</span><button class="icon-btn sm ghost" data-act="pjournal-del" data-id="${j.id}" aria-label="Delete journal entry">${icon('trash')}</button></div>
-        <input class="note-title" value="${esc(j.title)}" placeholder="Title" data-input="pjournal-title" data-id="${j.id}" aria-label="Entry title">
-        <textarea class="note-body" rows="5" placeholder="Write something…" data-input="pjournal-body" data-id="${j.id}" aria-label="Journal entry">\n${esc(j.body)}</textarea></article>`).join('') || empty('No journal entries yet. Write a longer reflection whenever you like.')}</div>
-      <button class="btn sm" data-act="pjournal-add" data-project="${id}">${icon('plus')}New journal entry</button>`)}
-    ${card('', 'Notes', '', `<p class="muted">Quick notes — also appear in that day’s daily entry.</p>
-      <div class="notes">${S.notesForProject(id).map(n => `<article class="note" data-key="${n.id}">
-        <div class="note-top"><span>${n.createdAt > 1e12 ? new Date(n.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Note'}</span><button class="icon-btn sm ghost" data-act="note-del" data-id="${n.id}" aria-label="Delete note">${icon('trash')}</button></div>
-        <input class="note-title" value="${esc(n.title)}" placeholder="Title" data-input="note-title" data-id="${n.id}" aria-label="Note title">
-        <textarea class="note-body" rows="3" placeholder="Write something…" data-input="note-body" data-id="${n.id}" aria-label="Note">\n${esc(n.body)}</textarea></article>`).join('') || empty('No notes yet. Jot down ideas, references or anything else for this project.')}</div>
-      <button class="btn sm" data-act="note-add" data-project="${id}">${icon('plus')}New note</button>`)}
-    ${card('', 'Linked goals', '', `<div class="goal-list">${linked.map(x => goalRow(x, { noParent: true })).join('') || empty('Not linked to a goal yet.')}</div>
-      ${free.length ? `<label class="m-link">${icon('link')}<select data-change="project-link-goal" data-id="${id}"><option value="">Link to a goal…</option>${free.map(x => opt(x.id, `${HNAME[x.horizon]} · ${x.title}`)).join('')}</select></label>` : ''}`)}
+    ${order.map(k => secCard(k, SEC_HTML[k])).join('')}
     <div class="m-foot"><button class="btn ghost" data-act="project-pin" data-id="${id}">${icon('pin')}${p.pinned ? 'Unpin from sidebar' : 'Pin to sidebar'}</button><button class="btn ghost danger" data-act="project-del" data-id="${id}">${icon('trash')}Delete project</button></div>`;
   };
+
+  /* journal entries pop out into their own modal for focused writing */
+  function pjournalModal(m) {
+    const j = S.s.projectJournal.find(x => x.id === m.id); if (!j) return null;
+    const p = S.project(j.projectId);
+    return `<div class="m-head"><span class="eyebrow">${p ? esc(p.title) + ' · ' : ''}Journal entry</span><button class="icon-btn m-close" data-act="modal-close" aria-label="Close">${icon('x')}</button></div>
+    <div class="m-body">
+      <input class="m-title" value="${esc(j.title)}" data-input="pjournal-title" data-id="${j.id}" aria-label="Entry title" placeholder="Title" ${m.fresh ? 'data-autofocus' : ''}>
+      <textarea class="m-desc jr-body" rows="12" placeholder="Write something…" data-input="pjournal-body" data-id="${j.id}" aria-label="Journal entry">\n${esc(j.body)}</textarea>
+      <div class="m-foot"><button class="btn ghost danger" data-act="pjournal-del" data-id="${j.id}">${icon('trash')}Delete entry</button></div>
+    </div>`;
+  }
 
   function goalModal(id) {
     const gl = S.goal(id); if (!gl) return null;
@@ -701,7 +727,7 @@
       <div class="results">${list.map((x, i) => `<button class="res${i === sel ? ' on' : ''}" data-key="${x.kind}${x.id || x.href}" data-act="search-go" data-i="${i}">${icon(x.icon)}<span><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></span>${icon('chevR')}</button>`).join('') || `<p class="empty-line pad">No matches for “${esc(ui.search.q)}”.</p>`}</div>`;
   }
 
-  V.modals = { goal: m => goalModal(m.id), search: searchModal };
+  V.modals = { goal: m => goalModal(m.id), search: searchModal, pjournal: pjournalModal };
   V.modal = () => {
     const m = ui.modal; if (!m) return '';
     const body = V.modals[m.type](m);

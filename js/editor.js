@@ -9,7 +9,7 @@
   function toolbar() {
     return `<div class="rt-bar" data-skip role="toolbar" aria-label="Text formatting">
       <select class="rt-sel" data-rt="block" aria-label="Text style"><option value="" selected>Style</option><option value="p">Paragraph</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="blockquote">Quote</option></select>
-      <select class="rt-sel" data-rt="size" aria-label="Text size"><option value="" selected>Size</option><option value="2">Small</option><option value="3">Normal</option><option value="5">Large</option><option value="6">Extra large</option></select>
+      <select class="rt-sel" data-rt="size" aria-label="Text size"><option value="" selected>Size</option>${[6, 8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 40].map(n => `<option value="${n}">${n}</option>`).join('')}</select>
       <span class="rt-sep"></span>
       ${btn('bold', 'bold', 'Bold (Ctrl+B)')}${btn('italic', 'italic', 'Italic (Ctrl+I)')}${btn('underline', 'underline', 'Underline (Ctrl+U)')}${btn('strikeThrough', 'strike', 'Strikethrough')}
       <span class="rt-sep"></span>
@@ -66,8 +66,22 @@
           return this.applySpacing(false);
         }
         if (s.dataset.rt === 'block') this.exec('formatBlock', s.value === 'p' ? 'p' : s.value);
-        if (s.dataset.rt === 'size') this.exec('fontSize', s.value);
+        if (s.dataset.rt === 'size') this.applySize(Number(s.value));
         s.value = '';
+      });
+      // click a divider (or near its thin line) to select it, so Backspace/Delete removes it like any other selected content
+      el.addEventListener('click', e => {
+        let hr = e.target.tagName === 'HR' ? e.target : null;
+        if (!hr) {
+          for (const h of el.querySelectorAll('hr')) {
+            const r = h.getBoundingClientRect();
+            if (e.clientX >= r.left - 4 && e.clientX <= r.right + 4 && e.clientY >= r.top - 10 && e.clientY <= r.bottom + 10) { hr = h; break; }
+          }
+        }
+        if (!hr) return;
+        const r = document.createRange(); r.selectNode(hr);
+        const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        this.range = r.cloneRange();
       });
       bar.addEventListener('input', e => {
         const c = e.target.closest('input[type=color]'); if (!c) return;
@@ -107,6 +121,23 @@
       this.el.focus(); this.restore();
       try { document.execCommand('styleWithCSS', false, true); } catch (_) { /* ignore */ }
       document.execCommand(cmd, false, val || null);
+      this.save(); this.sync();
+    },
+    /* wraps the selection in an exact pixel size by hand, instead of the legacy (and unreliable)
+       execCommand('fontSize', ...) 1-7 scale, which could corrupt the selection and wipe the text */
+    applySize(px) {
+      if (!this.el || !px) return;
+      this.el.focus(); this.restore();
+      const sel = getSelection();
+      if (!sel.rangeCount || !this.el.contains(sel.anchorNode) || sel.isCollapsed) return;
+      const range = sel.getRangeAt(0);
+      const span = document.createElement('span');
+      span.style.fontSize = px + 'px';
+      try { span.appendChild(range.extractContents()); range.insertNode(span); }
+      catch (_) { return; }
+      const nr = document.createRange(); nr.selectNodeContents(span);
+      sel.removeAllRanges(); sel.addRange(nr);
+      this.range = nr.cloneRange();
       this.save(); this.sync();
     },
     link() {

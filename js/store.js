@@ -134,6 +134,8 @@
 
     return {
       v: 2, user: { name: 'Leaf' }, habits, habitLog, projects, tasks, goals, notes, projectJournal: [], canvases,
+      schools: [], terms: [], courses: [], courseJournal: [],
+      dapukans: [], dapukanJournal: [],
       events, journal, moods, moodNotes, photos: [], prefs: { dailyMode: 'board', photoStyle: 'fill', mascot: true }, about,
       focus: { [yr]: 'Make more. Notice more. Live a little more intentionally.' },
     };
@@ -164,6 +166,11 @@
     s.habits.forEach(h => { if (!h.days) h.days = [0, 1, 2, 3, 4, 5, 6]; });
     s.notes.forEach(n => { if (n.projectId === undefined) n.projectId = null; });
     s.projectJournal = s.projectJournal || [];
+    s.schools = s.schools || []; s.terms = s.terms || []; s.courses = s.courses || []; s.courseJournal = s.courseJournal || [];
+    s.schools.forEach((sc, i) => { if (!sc.color) sc.color = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'][i % 6]; if (!sc.icon) sc.icon = 'book'; });
+    s.courses.forEach(c => { if (c.weeks == null) c.weeks = 0; if (c.startDate == null) c.startDate = ''; });
+    s.dapukans = s.dapukans || []; s.dapukanJournal = s.dapukanJournal || [];
+    s.dapukans.forEach(d => { if (d.desc == null) d.desc = ''; });
     if (s.user && s.user.name === 'Zack') s.user.name = 'Leaf';
   }
 
@@ -228,6 +235,12 @@
 
     /* ----- lookups ----- */
     project: id => Store.s.projects.find(p => p.id === id),
+    school: id => Store.s.schools.find(x => x.id === id),
+    term: id => Store.s.terms.find(x => x.id === id),
+    course: id => Store.s.courses.find(x => x.id === id),
+    termsFor: schoolId => Store.s.terms.filter(t => t.schoolId === schoolId),
+    coursesFor: termId => Store.s.courses.filter(c => c.termId === termId),
+    dapukan: id => Store.s.dapukans.find(x => x.id === id),
     goal: id => Store.s.goals.find(x => x.id === id),
     habit: id => Store.s.habits.find(h => h.id === id),
     task: id => Store.s.tasks.find(x => x.id === id),
@@ -240,6 +253,14 @@
     notesOn: day => Store.s.notes.filter(n => n.date === day).sort((a, b) => a.createdAt - b.createdAt),
     notesForProject: pid => Store.s.notes.filter(n => n.projectId === pid).sort((a, b) => b.createdAt - a.createdAt),
     journalForProject: pid => Store.s.projectJournal.filter(j => j.projectId === pid).sort((a, b) => b.createdAt - a.createdAt),
+    notesForCourse: cid => Store.s.notes.filter(n => n.courseId === cid).sort((a, b) => b.createdAt - a.createdAt),
+    journalForCourse: cid => Store.s.courseJournal.filter(j => j.courseId === cid).sort((a, b) => b.createdAt - a.createdAt),
+    notesForDapukan: did => Store.s.notes.filter(n => n.dapukanId === did).sort((a, b) => b.createdAt - a.createdAt),
+    journalForDapukan: did => Store.s.dapukanJournal.filter(j => j.dapukanId === did).sort((a, b) => b.createdAt - a.createdAt),
+    dapukanStats(d) {
+      const ts = this.s.tasks.filter(t => t.dapukanId === d.id);
+      return { total: ts.length, done: ts.filter(t => t.done).length };
+    },
     recentNotes(n) { return [...this.s.notes].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt).slice(0, n); },
     goalsFor: (h, p) => Store.s.goals.filter(x => x.horizon === h && x.period === p),
     goalsOn(day) { return ['year', 'month', 'week', 'day'].map(h => ({ h, p: D.periodOf(h, day), list: this.goalsFor(h, D.periodOf(h, day)) })); },
@@ -250,6 +271,22 @@
       const done = ts.filter(t => t.done).length;
       const pct = ts.length ? done / ts.length : (p.status === 'done' ? 1 : (p.manual || 0) / 100);
       return { total: ts.length, done, pct, next: ts.filter(t => !t.done).sort((a, b) => (a.date || '9').localeCompare(b.date || '9'))[0] };
+    },
+    courseStats(c) {
+      const ts = this.s.tasks.filter(t => t.courseId === c.id);
+      const done = ts.filter(t => t.done).length;
+      const taskPct = ts.length ? done / ts.length : null;
+      let timePct = null, weekNow = null;
+      if (c.weeks > 0 && c.startDate) {
+        const elapsedDays = (D.parse(D.today()) - D.parse(c.startDate)) / 864e5;
+        timePct = Math.min(1, Math.max(0, elapsedDays / (c.weeks * 7)));
+        weekNow = Math.min(c.weeks, Math.max(0, Math.ceil((elapsedDays + 1) / 7)));
+      }
+      const pct = taskPct != null && timePct != null ? (taskPct + timePct) / 2
+        : taskPct != null ? taskPct
+          : timePct != null ? timePct
+            : (c.manual || 0) / 100;
+      return { total: ts.length, done, pct, taskPct, timePct, weekNow, next: ts.filter(t => !t.done).sort((a, b) => (a.date || '9').localeCompare(b.date || '9'))[0] };
     },
     habitCount(hid, a, b) {
       let c = 0;

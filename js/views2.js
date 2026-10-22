@@ -154,6 +154,7 @@
       <div class="week-nav"><button class="icon-btn" data-act="calm-nav" data-d="-1" aria-label="Previous month">${icon('chevL')}</button><b class="cal-title">${D.MONTHS[m - 1]} ${y}</b><button class="icon-btn" data-act="calm-nav" data-d="1" aria-label="Next month">${icon('chevR')}</button><button class="btn sm ghost" data-act="calm-nav" data-d="0">Today</button></div>
       <span class="spacer"></span>
       <div class="seg"><button class="${ui.calView === 'month' ? 'on' : ''}" data-act="cal-view" data-v="month">${icon('calendar')}Month</button><button class="${ui.calView === 'agenda' ? 'on' : ''}" data-act="cal-view" data-v="agenda">${icon('list')}Agenda</button></div>
+      <button class="icon-btn" data-act="cal-full" aria-label="${ui.calFull ? 'Exit full screen' : 'Full screen'}" title="${ui.calFull ? 'Exit full screen' : 'Full screen'}">${icon(ui.calFull ? 'minimize' : 'maximize')}</button>
       <button class="btn primary" data-act="event-new" data-day="${sel}">${icon('plus')}Add event</button></div>`;
 
     const legend = `<div class="cal-legend"><span><i class="cc-mood" style="--fc:${MOOD[4].c}"></i>Mood</span><span>${icon('file')}Has an entry</span><span><i class="lg-bar"></i>Habits done</span><span><i class="lg-ev"></i>Event</span></div>`;

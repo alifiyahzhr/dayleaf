@@ -8,7 +8,7 @@
   const LEVELS = ['life', 'year', 'month', 'week', 'day'];
   try { if (localStorage.getItem('dayleaf.mascotOff') === '1') document.body.classList.add('no-mascot'); } catch (_) { /* ignore */ }
   const STATUS = { motion: 'In motion', horizon: 'On the horizon', done: 'Completed' };
-  const PAGES = ['dashboard', 'daily', 'journal', 'notes', 'calendar', 'habits', 'projects', 'project', 'goals', 'about'];
+  const PAGES = ['dashboard', 'daily', 'journal', 'notes', 'calendar', 'habits', 'projects', 'project', 'goals', 'about', 'school', 'course', 'dapukan', 'role'];
 
   /* ---------- routing & painting ---------- */
   const PERIOD_OK = {
@@ -20,6 +20,8 @@
     const name = parts[0] || 'dashboard';
     if (name === 'daily') return { name, params: { day: D.valid(parts[1]) ? parts[1] : t } };
     if (name === 'project') return { name, params: { id: parts[1] || null } };
+    if (name === 'course') return { name, params: { id: parts[1] || null } };
+    if (name === 'role') return { name, params: { id: parts[1] || null } };
     if (name === 'goals') {
       if (parts[1] === 'life') return { name, params: { h: 'life', id: parts[2] || null } };
       const h = HORIZ.includes(parts[1]) ? parts[1] : 'all';
@@ -37,6 +39,7 @@
       view.innerHTML = html;
       if (r.name === 'daily' && S.s.prefs.dailyMode === 'board') Board.mount(r.params.day);
       if (r.name === 'about') Board.mount('about');
+      if (r.name === 'course' && S.course(r.params.id)) Board.mount('course:' + r.params.id);
       Editor.applySpacing(false);
       Editor.mount();
       main.scrollTop = 0;
@@ -54,6 +57,7 @@
     const r = parse(), same = !first && JSON.stringify(r) === JSON.stringify(App.route);
     App.route = r;
     if (r.name === 'daily') { const d = D.parse(r.params.day); ui.cal = { y: d.getFullYear(), m: d.getMonth() }; }
+    if (r.name !== 'calendar' && ui.calFull) { ui.calFull = false; app.classList.remove('cal-full'); }
     app.classList.remove('nav-open');
     if (first) { first = false; return paint(true); }
     if (same) return paint(false);
@@ -82,9 +86,9 @@
     if (!title) return;
     const dateEl = row.querySelector('[data-f="date"]');
     const date = dateEl ? (dateEl.value || null) : (ti.dataset.day || null);
-    let projectId = ti.dataset.project || null, goalId = ti.dataset.goal || null;
+    let projectId = ti.dataset.project || null, goalId = ti.dataset.goal || null, courseId = ti.dataset.course || null, dapukanId = ti.dataset.dapukan || null;
     if (ti.dataset.scope === 'daily') { projectId = ui.addTask.project || null; goalId = ui.addTask.goal || null; ui.addTask = { project: '', goal: '' }; }
-    S.set(s => s.tasks.push({ id: uid(), title, date, projectId, goalId, done: false, createdAt: Date.now() }));
+    S.set(s => s.tasks.push({ id: uid(), title, date, projectId, goalId, courseId, dapukanId, done: false, createdAt: Date.now() }));
     ti.value = ''; if (dateEl && !dateEl.defaultValue) dateEl.value = '';
     ti.focus();
   }
@@ -206,6 +210,7 @@
     'modal-close': closeModal,
     backdrop: (el, e) => { if (e.target === el) closeModal(); },
     'focus-toggle': () => app.classList.toggle('focus'),
+    'cal-full': () => { ui.calFull = !ui.calFull; app.classList.toggle('cal-full', ui.calFull); refresh(); },
     'lock-now': () => {
       if (Security.enabled()) return Security.lock();
       ui.sec = { step: 'set', msg: '' }; openModal({ type: 'profile' });
@@ -318,9 +323,11 @@
     'pjournal-add': el => {
       const id = uid();
       S.set(s => s.projectJournal.push({ id, projectId: el.dataset.project, title: '', body: '', createdAt: Date.now() }));
-      requestAnimationFrame(() => requestAnimationFrame(() => view.querySelector(`input[data-id="${id}"]`)?.focus()));
+      openModal({ type: 'pjournal', id, fresh: true });
+      requestAnimationFrame(() => { const i = mroot.querySelector('.m-title'); i?.focus(); i?.select(); });
     },
-    'pjournal-del': el => S.set(s => { s.projectJournal = s.projectJournal.filter(j => j.id !== el.dataset.id); }),
+    'pjournal-open': el => openModal({ type: 'pjournal', id: el.dataset.id }),
+    'pjournal-del': el => { S.set(s => { s.projectJournal = s.projectJournal.filter(j => j.id !== el.dataset.id); }); closeModal(); },
 
     /* habits */
     'habit-toggle': el => S.set(s => {
@@ -376,7 +383,7 @@
     'event-open': el => openModal({ type: 'event', id: el.dataset.id }),
     'event-del': el => { S.set(s => { s.events = s.events.filter(e => e.id !== el.dataset.id); }); closeModal(); toast('Event deleted'); },
     'event-color': el => upd('events', el.dataset.id, e => { e.color = el.dataset.v; }),
-    'event-timed': el => upd('events', el.dataset.id, e => { e.allDay = false; if (!e.time) e.time = '09:00'; }),
+    'event-timed': el => upd('events', el.dataset.id, e => { e.allDay = false; }),
     'event-allday': el => upd('events', el.dataset.id, e => { e.allDay = true; }),
     'event-add': el => {
       const ti = rowTitle(el.closest('[data-row]')), title = ti.value.trim(); if (!title) return;
@@ -426,6 +433,117 @@
       const i = view.querySelector('[data-scope="daily"]');
       if (i) { i.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => i.focus({ preventScroll: true }), 300); }
     },
+
+    /* school */
+    'school-new': () => {
+      const id = uid(), covers = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'];
+      S.set(s => s.schools.push({ id, name: 'Untitled school', color: covers[s.schools.length % covers.length], icon: 'book' }));
+      requestAnimationFrame(() => requestAnimationFrame(() => { const i = view.querySelector(`.school-name[data-id="${id}"]`); i?.focus(); i?.select(); }));
+    },
+    'school-color': el => upd('schools', el.dataset.id, sc => { sc.color = el.dataset.v; }),
+    'school-icon': el => upd('schools', el.dataset.id, sc => { sc.icon = el.dataset.v; }),
+    'school-del': el => {
+      if (!arm(el, 'Click again to delete')) return;
+      S.set(s => {
+        const id = el.dataset.id;
+        const termIds = s.terms.filter(t => t.schoolId === id).map(t => t.id);
+        const courseIds = s.courses.filter(c => termIds.includes(c.termId)).map(c => c.id);
+        s.schools = s.schools.filter(x => x.id !== id);
+        s.terms = s.terms.filter(t => t.schoolId !== id);
+        s.courses = s.courses.filter(c => !termIds.includes(c.termId));
+        s.tasks.forEach(t => { if (courseIds.includes(t.courseId)) t.courseId = null; });
+        s.notes.forEach(n => { if (courseIds.includes(n.courseId)) n.courseId = null; });
+        s.courseJournal = s.courseJournal.filter(j => !courseIds.includes(j.courseId));
+      });
+    },
+    'term-new': el => {
+      const id = uid();
+      S.set(s => s.terms.push({ id, schoolId: el.dataset.school, name: 'New term', kind: 'semester' }));
+      requestAnimationFrame(() => requestAnimationFrame(() => { const i = view.querySelector(`.term-name[data-id="${id}"]`); i?.focus(); i?.select(); }));
+    },
+    'term-del': el => {
+      if (!arm(el, 'Click again to delete')) return;
+      S.set(s => {
+        const id = el.dataset.id;
+        const courseIds = s.courses.filter(c => c.termId === id).map(c => c.id);
+        s.terms = s.terms.filter(t => t.id !== id);
+        s.courses = s.courses.filter(c => c.termId !== id);
+        s.tasks.forEach(t => { if (courseIds.includes(t.courseId)) t.courseId = null; });
+        s.notes.forEach(n => { if (courseIds.includes(n.courseId)) n.courseId = null; });
+        s.courseJournal = s.courseJournal.filter(j => !courseIds.includes(j.courseId));
+      });
+    },
+    'course-new': el => {
+      const id = uid(), covers = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'];
+      S.set(s => s.courses.push({ id, termId: el.dataset.term, name: 'Untitled course', code: '', color: covers[s.courses.length % covers.length], icon: 'book', manual: 0, weeks: 0, startDate: '' }));
+      location.hash = `#/course/${id}`;
+      setTimeout(() => { const i = view.querySelector('.m-title'); i?.focus(); i?.select(); }, 200);
+    },
+    'course-open': el => { location.hash = `#/course/${el.dataset.id}`; },
+    'course-del': el => {
+      if (!arm(el, 'Click again to delete')) return;
+      S.set(s => {
+        const id = el.dataset.id;
+        s.courses = s.courses.filter(c => c.id !== id);
+        s.tasks.forEach(t => { if (t.courseId === id) t.courseId = null; });
+        s.notes.forEach(n => { if (n.courseId === id) n.courseId = null; });
+        s.courseJournal = s.courseJournal.filter(j => j.courseId !== id);
+      });
+      location.hash = '#/school';
+    },
+    'course-color': el => upd('courses', el.dataset.id, c => { c.color = el.dataset.v; }),
+    'course-icon': el => upd('courses', el.dataset.id, c => { c.icon = el.dataset.v; }),
+    'cnote-add': el => {
+      const id = uid();
+      S.set(s => s.notes.push({ id, date: D.today(), title: '', body: '', createdAt: Date.now(), projectId: null, courseId: el.dataset.course }));
+      requestAnimationFrame(() => requestAnimationFrame(() => view.querySelector(`input[data-id="${id}"]`)?.focus()));
+    },
+    'cnote-del': el => S.set(s => { s.notes = s.notes.filter(n => n.id !== el.dataset.id); }),
+    'cjournal-add': el => {
+      const id = uid();
+      S.set(s => s.courseJournal.push({ id, courseId: el.dataset.course, title: '', body: '', createdAt: Date.now() }));
+      openModal({ type: 'cjournal', id, fresh: true });
+      requestAnimationFrame(() => { const i = mroot.querySelector('.m-title'); i?.focus(); i?.select(); });
+    },
+    'cjournal-open': el => openModal({ type: 'cjournal', id: el.dataset.id }),
+    'cjournal-del': el => { S.set(s => { s.courseJournal = s.courseJournal.filter(j => j.id !== el.dataset.id); }); closeModal(); },
+
+    /* dapukan */
+    'dapukan-new': () => {
+      const id = uid(), covers = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'];
+      S.set(s => s.dapukans.push({ id, role: 'Untitled role', level: 'kelompok', unit: '', desc: '', color: covers[s.dapukans.length % covers.length], icon: 'book', projectIds: [] }));
+      location.hash = `#/role/${id}`;
+      setTimeout(() => { const i = view.querySelector('.m-title'); i?.focus(); i?.select(); }, 200);
+    },
+    'dapukan-open': el => { location.hash = `#/role/${el.dataset.id}`; },
+    'dapukan-del': el => {
+      if (!arm(el, 'Click again to delete')) return;
+      S.set(s => {
+        const id = el.dataset.id;
+        s.dapukans = s.dapukans.filter(d => d.id !== id);
+        s.tasks.forEach(t => { if (t.dapukanId === id) t.dapukanId = null; });
+        s.notes.forEach(n => { if (n.dapukanId === id) n.dapukanId = null; });
+        s.dapukanJournal = s.dapukanJournal.filter(j => j.dapukanId !== id);
+      });
+      location.hash = '#/dapukan';
+    },
+    'dapukan-color': el => upd('dapukans', el.dataset.id, d => { d.color = el.dataset.v; }),
+    'dapukan-icon': el => upd('dapukans', el.dataset.id, d => { d.icon = el.dataset.v; }),
+    'dapukan-unlink': el => upd('dapukans', el.dataset.id, d => { d.projectIds = (d.projectIds || []).filter(pid => pid !== el.dataset.pid); }),
+    'dnote-add': el => {
+      const id = uid();
+      S.set(s => s.notes.push({ id, date: D.today(), title: '', body: '', createdAt: Date.now(), projectId: null, dapukanId: el.dataset.dapukan }));
+      requestAnimationFrame(() => requestAnimationFrame(() => view.querySelector(`input[data-id="${id}"]`)?.focus()));
+    },
+    'dnote-del': el => S.set(s => { s.notes = s.notes.filter(n => n.id !== el.dataset.id); }),
+    'djournal-add': el => {
+      const id = uid();
+      S.set(s => s.dapukanJournal.push({ id, dapukanId: el.dataset.dapukan, title: '', body: '', createdAt: Date.now() }));
+      openModal({ type: 'djournal', id, fresh: true });
+      requestAnimationFrame(() => { const i = mroot.querySelector('.m-title'); i?.focus(); i?.select(); });
+    },
+    'djournal-open': el => openModal({ type: 'djournal', id: el.dataset.id }),
+    'djournal-del': el => { S.set(s => { s.dapukanJournal = s.dapukanJournal.filter(j => j.id !== el.dataset.id); }); closeModal(); },
 
     /* photo widget */
     'photo-add': () => photoFile.click(),
@@ -584,6 +702,19 @@
     'goal-target': el => upd('goals', el.dataset.id, g => { g.target = Math.max(1, Number(el.value) || 1); }),
     'project-title': el => upd('projects', el.dataset.id, p => { p.title = el.value; }),
     'project-desc': el => upd('projects', el.dataset.id, p => { p.desc = el.value; }),
+    'school-name': el => upd('schools', el.dataset.id, s => { s.name = el.value; }),
+    'term-name': el => upd('terms', el.dataset.id, t => { t.name = el.value; }),
+    'course-name': el => upd('courses', el.dataset.id, c => { c.name = el.value; }),
+    'course-code': el => upd('courses', el.dataset.id, c => { c.code = el.value; }),
+    'course-manual': el => upd('courses', el.dataset.id, c => { c.manual = Number(el.value); }),
+    'course-weeks': el => upd('courses', el.dataset.id, c => { c.weeks = Math.max(0, Number(el.value) || 0); }),
+    'cjournal-title': el => upd('courseJournal', el.dataset.id, j => { j.title = el.value; }),
+    'cjournal-body': el => upd('courseJournal', el.dataset.id, j => { j.body = el.value; }),
+    'dapukan-role': el => upd('dapukans', el.dataset.id, d => { d.role = el.value; }),
+    'dapukan-unit': el => upd('dapukans', el.dataset.id, d => { d.unit = el.value; }),
+    'dapukan-desc': el => upd('dapukans', el.dataset.id, d => { d.desc = el.value; }),
+    'djournal-title': el => upd('dapukanJournal', el.dataset.id, j => { j.title = el.value; }),
+    'djournal-body': el => upd('dapukanJournal', el.dataset.id, j => { j.body = el.value; }),
     'habit-name': el => upd('habits', el.dataset.id, h => { h.name = el.value; }),
     'habit-sub': el => upd('habits', el.dataset.id, h => { h.sub = el.value; }),
     'event-title': el => upd('events', el.dataset.id, e => { e.title = el.value; }),
@@ -602,6 +733,9 @@
     'project-status': el => upd('projects', el.dataset.id, p => { p.status = el.value; }),
     'project-area': el => upd('projects', el.dataset.id, p => { p.area = el.value; }),
     'project-due': el => upd('projects', el.dataset.id, p => { p.due = el.value; }),
+    'term-kind': el => upd('terms', el.dataset.id, t => { t.kind = el.value; }),
+    'dapukan-level': el => upd('dapukans', el.dataset.id, d => { d.level = el.value; }),
+    'dapukan-link': el => { if (el.value) upd('dapukans', el.dataset.id, d => { d.projectIds = [...(d.projectIds || []), el.value]; }); },
     'project-link-goal': el => { if (el.value) upd('goals', el.value, g => { g.projectId = el.dataset.id; }); },
     'goal-parent': el => upd('goals', el.dataset.id, g => { g.parentId = el.value || null; }),
     'goal-project': el => upd('goals', el.dataset.id, g => { g.projectId = el.value || null; }),
@@ -611,9 +745,10 @@
     'letter-date': el => { if (D.valid(el.value)) S.set(s => { const l = s.about.letters.find(x => x.id === el.dataset.id); if (l) l.openOn = el.value; }); },
     'mascot-visits': el => S.set(s => { s.prefs.mascot = el.checked; }),
     'event-date': el => { if (D.valid(el.value)) upd('events', el.dataset.id, e => { e.date = el.value; }); },
+    'course-start': el => { if (!el.value || D.valid(el.value)) upd('courses', el.dataset.id, c => { c.startDate = el.value; }); },
     'event-repeat': el => upd('events', el.dataset.id, e => { e.repeat = el.value; }),
     'event-until': el => upd('events', el.dataset.id, e => { e.until = el.value; }),
-    'event-allday': el => upd('events', el.dataset.id, e => { e.allDay = el.checked; if (!e.allDay && !e.time) e.time = '09:00'; }),
+    'event-allday': el => upd('events', el.dataset.id, e => { e.allDay = el.checked; }),
     'event-time': el => upd('events', el.dataset.id, e => { e.time = el.value; }),
     'event-end': el => upd('events', el.dataset.id, e => { e.endTime = el.value; }),
     autolock: el => { Security.setAutoLock(el.value); toast(Number(el.value) ? `Auto-lock after ${el.options[el.selectedIndex].text}` : 'Auto-lock is off'); },
@@ -638,7 +773,7 @@
   document.addEventListener('keydown', e => {
     if (!S.s) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); return ui.modal ? closeModal() : openModal({ type: 'search' }); }
-    if (e.key === 'Escape') { if (ui.modal) closeModal(); else if (app.classList.contains('focus')) app.classList.remove('focus'); else app.classList.remove('nav-open'); return; }
+    if (e.key === 'Escape') { if (ui.modal) closeModal(); else if (app.classList.contains('focus')) app.classList.remove('focus'); else if (ui.calFull) { ui.calFull = false; app.classList.remove('cal-full'); refresh(); } else app.classList.remove('nav-open'); return; }
     if (ui.modal && ui.modal.type === 'search' && ['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
       const n = V.searchList().length;
       e.preventDefault();
@@ -675,6 +810,38 @@
     const id = dragId, status = col.dataset.status;
     document.querySelectorAll('.over').forEach(x => x.classList.remove('over'));
     upd('projects', id, p => { if (p.status !== status) { p.status = status; toast(`Moved to ${STATUS[status]}`); } });
+  });
+
+  /* ---------- drag to reorder sections on a project page ---------- */
+  let secDragId = null;
+  document.addEventListener('dragstart', e => {
+    const c = e.target.closest && e.target.closest('[data-sec]'); if (!c) return;
+    secDragId = c.dataset.sec; e.dataTransfer.setData('text/plain', secDragId); e.dataTransfer.effectAllowed = 'move';
+    requestAnimationFrame(() => c.classList.add('dragging'));
+  });
+  document.addEventListener('dragend', () => {
+    secDragId = null;
+    document.querySelectorAll('[data-sec].dragging,[data-sec].over').forEach(x => x.classList.remove('dragging', 'over'));
+  });
+  document.addEventListener('dragover', e => {
+    if (!secDragId) return;
+    const c = e.target.closest('[data-sec]'); if (!c) return;
+    e.preventDefault();
+    document.querySelectorAll('[data-sec].over').forEach(x => { if (x !== c) x.classList.remove('over'); });
+    if (c.dataset.sec !== secDragId) c.classList.add('over');
+  });
+  document.addEventListener('drop', e => {
+    const c = e.target.closest('[data-sec]'); if (!c || !secDragId || c.dataset.sec === secDragId) return;
+    e.preventDefault();
+    const from = secDragId, to = c.dataset.sec, list = c.dataset.list, rid = c.dataset.id;
+    document.querySelectorAll('[data-sec].over').forEach(x => x.classList.remove('over'));
+    const keys = list === 'courses' ? U.COURSE_SECTIONS : list === 'dapukans' ? U.DAPUKAN_SECTIONS : U.PROJECT_SECTIONS;
+    upd(list, rid, rec => {
+      const order = (rec.sections || keys).slice();
+      keys.forEach(k => { if (!order.includes(k)) order.push(k); });
+      order.splice(order.indexOf(from), 1); order.splice(order.indexOf(to), 0, from);
+      rec.sections = order;
+    });
   });
 
   /* ---------- boot ---------- */

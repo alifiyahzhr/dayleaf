@@ -131,6 +131,10 @@
     corner: '<polyline points="15 10 20 15 15 20"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/>',
     inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
     maximize: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+    minimize: '<path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/>',
+    grip: '<circle cx="9" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
+    graduation: '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>',
+    layers: '<path d="m12.83 2.18 8.58 3.91a1 1 0 0 1 0 1.83l-8.58 3.9a2 2 0 0 1-1.66 0L2.6 7.92a1 1 0 0 1 0-1.83z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
   };
   Object.assign(ICONS, {
     lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
@@ -301,7 +305,10 @@
     rd.readAsDataURL(file);
   }
 
-  g.U = { D, esc, uid, clamp, min, icon, morph, toast, tone, MOOD, COL_MAIN, COL_MORE, evHex, sanitize, plainToHtml, ink, habStyle, readImage };
+  const PROJECT_SECTIONS = ['tasks', 'journal', 'notes', 'goals'];
+  const COURSE_SECTIONS = ['tasks', 'notes', 'journal'];
+  const DAPUKAN_SECTIONS = ['todo', 'notes', 'journal', 'links'];
+  g.U = { D, esc, uid, clamp, min, icon, morph, toast, tone, MOOD, COL_MAIN, COL_MORE, evHex, sanitize, plainToHtml, ink, habStyle, readImage, PROJECT_SECTIONS, COURSE_SECTIONS, DAPUKAN_SECTIONS };
   g.App = {
     route: { name: 'dashboard', params: {} },
     ui: {
@@ -309,7 +316,7 @@
       search: { q: '', sel: 0 },
       view: { projects: 'board', area: 'all' },
       addTask: { project: '', goal: '' },
-      quote: 0, photoIdx: 0, habWk: null, calM: null, calSel: null, calView: 'month',
+      quote: 0, photoIdx: 0, habWk: null, calM: null, calSel: null, calView: 'month', calFull: false,
       allYears: false, jBrowse: 'month', nBrowse: 'month', pastOpen: {}, treeOpen: {}, ny: { goals: true, tasks: true, focus: true },
       restore: null, bannerH: 'all', moreColors: false, journalQ: '', journalSort: 'new', jOpen: {}, notesQ: '', notesSort: 'new', mascotSeed: 0,
       sec: { step: 'idle', msg: '' },
