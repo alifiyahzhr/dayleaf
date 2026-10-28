@@ -591,14 +591,11 @@
       const msg = (m, ok) => { ui.sec = Object.assign({}, ui.sec, { msg: m, ok: !!ok }); refresh(); };
       el.disabled = true;
       try {
-        if (step === 'remove') { await Security.disable(v('cur')); ui.sec = { step: 'idle', msg: 'PIN removed. Your data is now stored without a PIN.', ok: true }; }
-        else {
-          const n = v('new');
-          if (!/^\d{4,6}$/.test(n)) { el.disabled = false; return msg('Use 4–6 digits for your PIN.'); }
-          if (n !== v('conf')) { el.disabled = false; return msg('The two PINs don’t match.'); }
-          if (step === 'change') await Security.change(v('cur'), n); else await Security.enable(n);
-          ui.sec = { step: 'idle', msg: 'PIN saved. Your data is protected.', ok: true };
-        }
+        const n = v('new');
+        if (!/^\d{4,6}$/.test(n)) { el.disabled = false; return msg('Use 4–6 digits for your PIN.'); }
+        if (n !== v('conf')) { el.disabled = false; return msg('The two PINs don’t match.'); }
+        if (step === 'change') await Security.change(v('cur'), n); else await Security.enable(n);
+        ui.sec = { step: 'idle', msg: 'PIN saved. Your data is protected.', ok: true };
         refresh();
       } catch (e) { el.disabled = false; msg(e.message || 'Something went wrong.'); }
     },
@@ -665,7 +662,7 @@
       S.load(JSON.stringify(data)); closeModal(); paint(true); toast('Synced from the cloud');
     },
     'sync-pull-cancel': () => { ui.sync = Object.assign({}, ui.sync, { pullPreview: null }); refresh(); },
-    'sync-signout': async () => { await Sync.signOut(); ui.sync = { mode: 'signin', msg: '', ok: false, pullPreview: null }; refresh(); },
+    'sync-signout': async () => { await Sync.signOut(); Security.wipeLocal(); location.reload(); },
     'sync-reset-request': async el => {
       const row = el.closest('[data-row-sync]'), email = (row.querySelector('[data-f="email"]') || {}).value || '';
       if (!email) { ui.sync = Object.assign({}, ui.sync, { msg: 'Enter your email.', ok: false }); return refresh(); }

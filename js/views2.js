@@ -312,8 +312,8 @@
     const pinInput = (f, ph) => `<input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" data-f="${f}" placeholder="${ph}" aria-label="${ph}">`;
     const form = sec.step === 'idle' ? '' : `<div class="sec-form" data-row>
         ${sec.step !== 'set' ? pinInput('cur', 'Current PIN') : ''}
-        ${sec.step !== 'remove' ? pinInput('new', 'New PIN (4–6 digits)') + pinInput('conf', 'Confirm new PIN') : ''}
-        <div class="sec-btns"><button class="btn primary sm" data-act="sec-save">${sec.step === 'remove' ? 'Remove PIN' : 'Save PIN'}</button><button class="btn ghost sm" data-act="sec-cancel">Cancel</button></div></div>`;
+        ${pinInput('new', 'New PIN (4–6 digits)')}${pinInput('conf', 'Confirm new PIN')}
+        <div class="sec-btns"><button class="btn primary sm" data-act="sec-save">Save PIN</button><button class="btn ghost sm" data-act="sec-cancel">Cancel</button></div></div>`;
     return `<div class="m-head"><span class="eyebrow">Settings</span><button class="icon-btn m-close" data-act="modal-close" aria-label="Close">${icon('x')}</button></div>
     <div class="m-body">
       <label class="m-field">Your name<input value="${esc(S.s.user.name)}" data-input="user-name" placeholder="Your name"><small>Used to greet you on the dashboard.</small></label>
@@ -327,7 +327,7 @@
       ${form}
       <p class="sec-msg${sec.msg ? ' show' : ''} ${sec.ok ? 'ok' : ''}" role="status">${esc(sec.msg || '')}</p>
       ${sec.step === 'idle' ? `<div class="sec-actions">
-        ${on ? `<button class="btn" data-act="sec-start" data-v="change">${icon('lock')}Change PIN</button><button class="btn ghost" data-act="sec-start" data-v="remove">Remove PIN</button><button class="btn ghost" data-act="lock-now">Lock now</button>` : `<button class="btn primary" data-act="sec-start" data-v="set">${icon('shield')}Set a PIN</button>`}
+        ${on ? `<button class="btn" data-act="sec-start" data-v="change">${icon('lock')}Change PIN</button><button class="btn ghost" data-act="lock-now">Lock now</button>` : `<button class="btn primary" data-act="sec-start" data-v="set">${icon('shield')}Set a PIN</button>`}
       </div>` : ''}
       ${on ? `<label class="m-field">Auto-lock after inactivity<select data-change="autolock">${[[1, '1 minute'], [5, '5 minutes'], [15, '15 minutes'], [30, '30 minutes'], [60, '1 hour'], [0, 'Never']].map(([v, l]) => opt(String(v), l, (m.autoLock ?? 5) === v)).join('')}</select></label>` : ''}
       <ul class="sec-notes"><li>Five wrong PINs trigger a timed pause that gets longer each time.</li><li>Data never leaves this device. If you forget your PIN it cannot be recovered.</li></ul>

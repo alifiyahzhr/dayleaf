@@ -83,13 +83,18 @@
       setup1: ['Create a PIN', 'Choose 4–6 digits. Your data is encrypted with it, so keep it somewhere safe.'],
       setup2: ['Confirm your PIN', 'Enter the same digits once more.'],
     }[L.mode];
-    if (L.mode === 'welcome') {
-      const hasPin = !!meta();
+    if (L.mode === 'checking') {
       return `<div class="lock-card">
         <img class="lk-bunny" src="assets/mascot.png" alt="" draggable="false">
         <span class="lk-logo">${icon('sparkles')}</span>
-        <h2>Welcome to dayleaf</h2><p class="lk-sub">A calm space for your days.</p>
-        <button class="btn primary lk-go lk-start" data-lk="welcome-start" ${hasPin ? '' : 'disabled'}>Start</button>
+        <h2>One moment…</h2><p class="lk-sub">Checking your account.</p>
+      </div>`;
+    }
+    if (L.mode === 'welcome') {
+      return `<div class="lock-card">
+        <img class="lk-bunny" src="assets/mascot.png" alt="" draggable="false">
+        <span class="lk-logo">${icon('sparkles')}</span>
+        <h2>Welcome to dayleaf</h2><p class="lk-sub">Sign in or create an account to continue — your data is only ever available to you, signed in.</p>
         <div class="lk-split"><button class="btn lk-signin" data-lk="welcome-signin">Sign in</button><button class="btn lk-signup" data-lk="welcome-signup">Sign up</button></div>
       </div>`;
     }
@@ -167,7 +172,7 @@
       <div class="lk-dots${L.shake ? ' shake' : ''}${L.busy ? ' busy' : ''}">${dots}</div>
       <p class="lk-msg${wait || L.msg ? ' show' : ''}">${wait ? `Too many attempts. Try again in ${fmt(wait)}` : L.msg}</p>
       <div class="lk-pad">${pad}</div>
-      ${L.mode === 'setup1' ? `<button class="btn primary lk-go" data-lk="next" ${L.pin.length >= 4 ? '' : 'disabled'}>Continue</button><button class="lk-link" data-lk="skip">Not now</button>` : ''}
+      ${L.mode === 'setup1' ? `<button class="btn primary lk-go" data-lk="next" ${L.pin.length >= 4 ? '' : 'disabled'}>Continue</button>` : ''}
       ${L.mode === 'setup2' ? `<button class="lk-link" data-lk="restart">Start over</button>` : ''}
       ${L.mode === 'unlock' ? `<button class="lk-link" data-lk="forgot">Forgot PIN?</button>` : ''}
     </div>`;
@@ -224,18 +229,12 @@
   function lkAction(a) {
     if (a === 'next' && L.pin.length >= 4) { L.first = L.pin; L.pin = ''; L.mode = 'setup2'; paintLock(); }
     if (a === 'restart') { L.mode = 'setup1'; L.first = ''; L.pin = ''; paintLock(); }
-    if (a === 'skip') { setMeta({ mode: 'none', autoLock: 5 }); goToName(L.cloudData, null); }
     if (a === 'forgot') { L.mode = 'forgot'; L.armed = false; paintLock(); }
     if (a === 'back') { L.mode = 'unlock'; L.pin = ''; paintLock(); }
     if (a === 'erase') {
       if (!L.armed) { L.armed = true; paintLock(); setTimeout(() => { L.armed = false; if (L.mode === 'forgot') paintLock(); }, 3500); return; }
-      localStorage.removeItem(VAULT); localStorage.removeItem(PLAIN); localStorage.removeItem(META);
+      Security.wipeLocal();
       key = null; L.mode = 'welcome'; L.first = ''; L.pin = ''; L.armed = false; paintLock();
-    }
-    if (a === 'welcome-start') {
-      const m = meta();
-      if (m && m.mode === 'none') { document.body.classList.remove('locked'); hideLock(); ready(localStorage.getItem(PLAIN), null); }
-      else if (m) { L.mode = 'unlock'; L.pin = ''; paintLock(); }
     }
     if (a === 'welcome-signin') { L.forgotFlow = false; L.mode = 'cloud'; L.cloud = { tab: 'signin', msg: '', busy: false }; paintLock(); }
     if (a === 'welcome-signup') { L.forgotFlow = false; L.mode = 'cloud'; L.cloud = { tab: 'signup', msg: '', busy: false }; paintLock(); }
@@ -340,13 +339,32 @@
     enabled() { const m = meta(); return !!m && m.mode !== 'none'; },
     encrypted() { const m = meta(); return !!m && m.mode === 'vault'; },
 
-    run(cb) {
+    async run(cb) {
       ready = cb;
       if (g.Sync && g.Sync.pendingRecovery) { L.mode = 'reset-password'; L.cloud = { msg: '', busy: false }; showLock(); return; }
+      L.mode = 'checking'; showLock();
+      let signedIn = false;
+      try { signedIn = g.Sync.isSignedIn() && await g.Sync.verifySession(); } catch (_) { signedIn = false; }
+      if (!signedIn) { L.mode = 'welcome'; paintLock(); return; }
       const m = meta();
-      if (!m) { L.mode = 'welcome'; showLock(); }
-      else if (m.mode === 'none') { document.body.classList.remove('locked'); cb(localStorage.getItem(PLAIN), null); }
-      else { L.mode = 'unlock'; showLock(); }
+      if (!m) {
+        try {
+          const p = await g.Sync.preview();
+          L.cloudData = p ? JSON.stringify(p.data) : null;
+          L.mode = 'setup1'; L.first = ''; L.pin = '';
+        } catch (e) {
+          if (e.code === 'passphrase-needed') { L.mode = 'cloud-pass'; L.cloud = { tab: 'signin', msg: '', busy: false }; }
+          else { L.mode = 'cloud'; L.cloud = { tab: 'signin', msg: e.message || 'Something went wrong.', busy: false }; }
+        }
+        return paintLock();
+      }
+      if (m.mode === 'none') {
+        // an account from before a PIN was required — keep its existing local data, just add a PIN now
+        L.cloudData = localStorage.getItem(PLAIN) || null;
+        L.mode = 'setup1'; L.first = ''; L.pin = '';
+        return paintLock();
+      }
+      L.mode = 'unlock'; paintLock();
     },
     persist(str) {
       const m = meta();
@@ -368,11 +386,7 @@
       if (!(await this.verify(oldPin))) throw new Error('Current PIN is incorrect');
       await this.enable(newPin);
     },
-    async disable(pin) {
-      if (!(await this.verify(pin))) throw new Error('PIN is incorrect');
-      localStorage.setItem(PLAIN, JSON.stringify(Store.s)); localStorage.removeItem(VAULT);
-      key = null; setMeta({ mode: 'none', autoLock: 5 }); clearTimeout(idleT);
-    },
+    wipeLocal() { localStorage.removeItem(VAULT); localStorage.removeItem(PLAIN); localStorage.removeItem(META); },
     setAutoLock(min) { const m = meta(); if (m) { m.autoLock = Number(min); setMeta(m); arm(); } },
     async lock() {
       if (!this.enabled() || L.active) return;

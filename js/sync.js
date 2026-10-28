@@ -65,6 +65,14 @@
     hasPassphrase: () => !!encKey,
     lastSyncedAt: null,
 
+    /* confirms the session is a real, currently-valid account with Supabase — not just a
+       locally-cached flag — so stale or forged local state can never substitute for signing in */
+    async verifySession() {
+      if (!session) return false;
+      try { await rest('/auth/v1/user'); return true; }
+      catch (_) { setSession(null); encKey = null; this.needsPassphrase = false; return false; }
+    },
+
     async signUp(email, pw) {
       const r = await raw('/auth/v1/signup', { method: 'POST', body: JSON.stringify({ email, password: pw }) });
       if (!r.access_token) return { confirmEmail: true };
