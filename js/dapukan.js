@@ -57,7 +57,7 @@
           <span class="jrow-main"><b>${esc(j.title || 'Untitled entry')}</b><small>${esc((j.body || '').slice(0, 90) || 'No written entry')}</small></span>
           <span class="jrow-date">${D.short(new Date(j.createdAt).toISOString().slice(0, 10))}</span>${icon('chevR')}</button>`).join('') || empty('No journal entries yet.')}</div>
         <button class="btn sm" data-act="djournal-add" data-dapukan="${id}">${icon('plus')}New journal entry</button>`,
-      links: `<div class="tags wrap">${linked.map(p => `<span class="link-chip"><button class="chip proj ${p.cover}" data-act="project-open" data-id="${p.id}">${esc(p.title)}</button><button class="icon-btn sm ghost" data-act="dapukan-unlink" data-id="${id}" data-pid="${p.id}" aria-label="Unlink ${esc(p.title)}">${icon('x')}</button></span>`).join('') || empty('No linked projects yet.')}</div>
+      links: `<div class="course-grid link-grid">${linked.map(p => `<div class="link-card-wrap"><a class="course-card ${p.cover}" href="#/project/${p.id}"><span class="cc-icon">${icon(p.icon)}</span><b>${esc(p.title)}</b></a><button class="icon-btn sm ghost link-unlink" data-act="dapukan-unlink" data-id="${id}" data-pid="${p.id}" aria-label="Unlink ${esc(p.title)}">${icon('x')}</button></div>`).join('') || empty('No linked projects yet.')}</div>
         ${free.length ? `<label class="m-link">${icon('link')}<select data-change="dapukan-link" data-id="${id}"><option value="">Link a personal project…</option>${free.map(p => opt(p.id, p.title)).join('')}</select></label>` : ''}`,
     };
     const order = (d.sections || U.DAPUKAN_SECTIONS).slice();

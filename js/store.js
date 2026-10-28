@@ -136,6 +136,7 @@
       v: 2, user: { name: 'Leaf' }, habits, habitLog, projects, tasks, goals, notes, projectJournal: [], canvases,
       schools: [], terms: [], courses: [], courseJournal: [],
       dapukans: [], dapukanJournal: [],
+      journals: [], journalEntries: [],
       events, journal, moods, moodNotes, photos: [], prefs: { dailyMode: 'board', photoStyle: 'fill', mascot: true }, about,
       focus: { [yr]: 'Make more. Notice more. Live a little more intentionally.' },
     };
@@ -171,6 +172,7 @@
     s.courses.forEach(c => { if (c.weeks == null) c.weeks = 0; if (c.startDate == null) c.startDate = ''; });
     s.dapukans = s.dapukans || []; s.dapukanJournal = s.dapukanJournal || [];
     s.dapukans.forEach(d => { if (d.desc == null) d.desc = ''; });
+    s.journals = s.journals || []; s.journalEntries = s.journalEntries || [];
     if (s.user && s.user.name === 'Zack') s.user.name = 'Leaf';
   }
 
@@ -241,6 +243,8 @@
     termsFor: schoolId => Store.s.terms.filter(t => t.schoolId === schoolId),
     coursesFor: termId => Store.s.courses.filter(c => c.termId === termId),
     dapukan: id => Store.s.dapukans.find(x => x.id === id),
+    journalCat: id => Store.s.journals.find(x => x.id === id),
+    entriesForJournal: jid => Store.s.journalEntries.filter(e => e.journalId === jid),
     goal: id => Store.s.goals.find(x => x.id === id),
     habit: id => Store.s.habits.find(h => h.id === id),
     task: id => Store.s.tasks.find(x => x.id === id),

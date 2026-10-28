@@ -581,6 +581,7 @@
         ${nav('dashboard', '#/dashboard', 'layout', 'Dashboard')}
         ${nav('daily', `#/daily/${t}`, 'book', 'Daily Entry')}
         ${nav('journal', '#/journal', 'pencil', 'Journal')}
+        ${nav('journals', '#/journals', 'columns', 'Journals')}
         ${nav('notes', '#/notes', 'file', 'Notes')}
         ${nav('calendar', '#/calendar', 'calendar', 'Calendar')}
         ${nav('habits', '#/habits', 'activity', 'Habit Tracker')}
@@ -602,10 +603,11 @@
       <button class="icon-btn lock-btn" data-act="lock-now" aria-label="Lock dayleaf" title="${Security.enabled() ? 'Lock now' : 'Set a PIN'}">${icon('lock')}</button></div>`;
   };
 
-  const CRUMB = { dashboard: 'Dashboard', daily: 'Daily Entry', journal: 'Journal', notes: 'Notes', calendar: 'Calendar', habits: 'Habit Tracker', projects: 'Personal Projects', goals: 'Future Goals', about: 'About Me', school: 'School', dapukan: 'Dapukan' };
+  const CRUMB = { dashboard: 'Dashboard', daily: 'Daily Entry', journal: 'Journal', journals: 'Journals', notes: 'Notes', calendar: 'Calendar', habits: 'Habit Tracker', projects: 'Personal Projects', goals: 'Future Goals', about: 'About Me', school: 'School', dapukan: 'Dapukan' };
   const crumbFor = r => r.name === 'project' ? ((S.project(r.params.id) || {}).title || 'Project')
     : r.name === 'course' ? ((S.course(r.params.id) || {}).name || 'Course')
     : r.name === 'role' ? ((S.dapukan(r.params.id) || {}).role || 'Role')
+    : r.name === 'journalcat' ? ((S.journalCat(r.params.id) || {}).name || 'Journal')
     : CRUMB[r.name];
   V.title = () => crumbFor(App.route);
   V.topbar = () => `<button class="icon-btn menu-btn" data-act="nav-open" aria-label="Open menu">${icon('menu')}</button>

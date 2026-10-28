@@ -319,6 +319,7 @@
       quote: 0, photoIdx: 0, habWk: null, calM: null, calSel: null, calView: 'month', calFull: false,
       allYears: false, jBrowse: 'month', nBrowse: 'month', pastOpen: {}, treeOpen: {}, ny: { goals: true, tasks: true, focus: true },
       restore: null, bannerH: 'all', moreColors: false, journalQ: '', journalSort: 'new', jOpen: {}, notesQ: '', notesSort: 'new', mascotSeed: 0,
+      jcQ: '', jcSort: 'new', jeOpen: {},
       sec: { step: 'idle', msg: '' },
       sync: { mode: 'signin', msg: '', ok: false, pullPreview: null },
     },

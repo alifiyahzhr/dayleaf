@@ -8,7 +8,7 @@
   const LEVELS = ['life', 'year', 'month', 'week', 'day'];
   try { if (localStorage.getItem('dayleaf.mascotOff') === '1') document.body.classList.add('no-mascot'); } catch (_) { /* ignore */ }
   const STATUS = { motion: 'In motion', horizon: 'On the horizon', done: 'Completed' };
-  const PAGES = ['dashboard', 'daily', 'journal', 'notes', 'calendar', 'habits', 'projects', 'project', 'goals', 'about', 'school', 'course', 'dapukan', 'role'];
+  const PAGES = ['dashboard', 'daily', 'journal', 'journals', 'journalcat', 'notes', 'calendar', 'habits', 'projects', 'project', 'goals', 'about', 'school', 'course', 'dapukan', 'role'];
 
   /* ---------- routing & painting ---------- */
   const PERIOD_OK = {
@@ -22,6 +22,7 @@
     if (name === 'project') return { name, params: { id: parts[1] || null } };
     if (name === 'course') return { name, params: { id: parts[1] || null } };
     if (name === 'role') return { name, params: { id: parts[1] || null } };
+    if (name === 'journalcat') return { name, params: { id: parts[1] || null } };
     if (name === 'goals') {
       if (parts[1] === 'life') return { name, params: { h: 'life', id: parts[2] || null } };
       const h = HORIZ.includes(parts[1]) ? parts[1] : 'all';
@@ -278,6 +279,7 @@
     'journal-toggle': el => { ui.jOpen[el.dataset.day] = !ui.jOpen[el.dataset.day]; refresh(); },
     'journal-sort': el => { ui.journalSort = el.dataset.v; refresh(); },
     'notes-sort': el => { ui.notesSort = el.dataset.v; refresh(); },
+    'jcat-sort': el => { ui.jcSort = el.dataset.v; refresh(); },
 
     /* about me */
     'trait-del': el => S.set(s => { s.about.traits = s.about.traits.filter(x => x !== el.dataset.v); }),
@@ -545,6 +547,34 @@
     'djournal-open': el => openModal({ type: 'djournal', id: el.dataset.id }),
     'djournal-del': el => { S.set(s => { s.dapukanJournal = s.dapukanJournal.filter(j => j.id !== el.dataset.id); }); closeModal(); },
 
+    /* journals (custom, alongside Daily) */
+    'journalcat-new': () => {
+      const id = uid(), covers = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'];
+      S.set(s => s.journals.push({ id, name: 'Untitled journal', color: covers[s.journals.length % covers.length], icon: 'pencil' }));
+      location.hash = `#/journalcat/${id}`;
+      setTimeout(() => { const i = view.querySelector('.m-title'); i?.focus(); i?.select(); }, 200);
+    },
+    'journalcat-del': el => {
+      if (!arm(el, 'Click again to delete')) return;
+      S.set(s => {
+        const id = el.dataset.id;
+        s.journals = s.journals.filter(j => j.id !== id);
+        s.journalEntries = s.journalEntries.filter(e => e.journalId !== id);
+      });
+      location.hash = '#/journals';
+    },
+    'journalcat-color': el => upd('journals', el.dataset.id, j => { j.color = el.dataset.v; }),
+    'journalcat-icon': el => upd('journals', el.dataset.id, j => { j.icon = el.dataset.v; }),
+    'jentry-new': el => {
+      const id = uid();
+      S.set(s => s.journalEntries.push({ id, journalId: el.dataset.journal, title: '', body: '', date: D.today(), createdAt: Date.now(), updated: Date.now() }));
+      openModal({ type: 'jentry', id, fresh: true });
+      requestAnimationFrame(() => { const i = mroot.querySelector('.m-title'); i?.focus(); i?.select(); });
+    },
+    'jentry-edit': el => openModal({ type: 'jentry', id: el.dataset.id }),
+    'jentry-del': el => { S.set(s => { s.journalEntries = s.journalEntries.filter(e => e.id !== el.dataset.id); }); closeModal(); },
+    'jentry-toggle': el => { ui.jeOpen[el.dataset.id] = !ui.jeOpen[el.dataset.id]; refresh(); },
+
     /* photo widget */
     'photo-add': () => photoFile.click(),
     'photo-go': el => { ui.photoIdx = Number(el.dataset.i); refresh(); },
@@ -715,6 +745,10 @@
     'dapukan-desc': el => upd('dapukans', el.dataset.id, d => { d.desc = el.value; }),
     'djournal-title': el => upd('dapukanJournal', el.dataset.id, j => { j.title = el.value; }),
     'djournal-body': el => upd('dapukanJournal', el.dataset.id, j => { j.body = el.value; }),
+    'journalcat-name': el => upd('journals', el.dataset.id, j => { j.name = el.value; }),
+    'jentry-title': el => upd('journalEntries', el.dataset.id, e => { e.title = el.value; }),
+    'jentry-body': el => upd('journalEntries', el.dataset.id, e => { e.body = el.value; }),
+    'jcat-q': el => { ui.jcQ = el.value; refresh(); },
     'habit-name': el => upd('habits', el.dataset.id, h => { h.name = el.value; }),
     'habit-sub': el => upd('habits', el.dataset.id, h => { h.sub = el.value; }),
     'event-title': el => upd('events', el.dataset.id, e => { e.title = el.value; }),
@@ -746,6 +780,7 @@
     'mascot-visits': el => S.set(s => { s.prefs.mascot = el.checked; }),
     'event-date': el => { if (D.valid(el.value)) upd('events', el.dataset.id, e => { e.date = el.value; }); },
     'course-start': el => { if (!el.value || D.valid(el.value)) upd('courses', el.dataset.id, c => { c.startDate = el.value; }); },
+    'jentry-date': el => { if (D.valid(el.value)) upd('journalEntries', el.dataset.id, e => { e.date = el.value; }); },
     'event-repeat': el => upd('events', el.dataset.id, e => { e.repeat = el.value; }),
     'event-until': el => upd('events', el.dataset.id, e => { e.until = el.value; }),
     'event-allday': el => upd('events', el.dataset.id, e => { e.allDay = el.checked; }),

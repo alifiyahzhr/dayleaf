@@ -805,8 +805,11 @@ body.locked #app, body.locked #modal-root, body.locked #toast-root { display: no
 .cc-prog small { font-size: 11px; font-weight: 600; flex: none; }
 .course-new { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 14px; border-radius: 14px; border: 1.5px dashed var(--line); color: var(--ink-3); min-height: 108px; background: none; transition: background .2s, border-color .2s, color .2s; }
 .course-new:hover { background: var(--sky-100); border-color: var(--blue-300); color: var(--blue-700); }
-.tags.wrap { justify-content: flex-start; }
-.link-chip { display: inline-flex; align-items: center; gap: 2px; }
+.link-grid { margin-bottom: 2px; }
+.link-card-wrap { position: relative; }
+.link-card-wrap .course-card { min-height: 0; padding: 16px 14px; }
+.link-unlink { position: absolute; top: -6px; right: -6px; background: var(--panel); box-shadow: 0 0 0 1px rgba(36, 50, 64, .15); }
+.link-unlink:hover { background: var(--sky-100); }
 .cal-title { font-size: 20px; letter-spacing: -.015em; min-width: 170px; text-align: center; font-weight: 650; }
 .cal-layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; align-items: start; }
 .cal-card { padding: 16px; }
